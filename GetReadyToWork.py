@@ -24,6 +24,7 @@ if sys.platform == "win32":
         import winapps
 
 from time import sleep
+from datetime import date, datetime
 
 
 logging.basicConfig(filename='logs.log', encoding='utf-8', level=logging.DEBUG)
@@ -50,7 +51,7 @@ def open_file(appName):
         try:
             os.startfile(appName)
         except:
-            logging.error(f"Failed launching app: "+appName)
+            logging.error(f" {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} | Failed launching app: "+appName)
     else:
         try:
             opener = "open" if sys.platform == "darwin" else "xdg-open"
