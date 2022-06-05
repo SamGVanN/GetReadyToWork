@@ -6,7 +6,7 @@ If you're interested in participating to this project
 4) Have fun
 
 
-This project follows ConventionalCommits
+This project (tries to) follow ConventionalCommits
 https://www.conventionalcommits.org/en/v1.0.0/
 
 
