@@ -1,0 +1,72 @@
+
+>------------------------------------------------------------------
+>---------------------------	HOW TO	---------------------------
+>------------------------------------------------------------------
+
+If you have not done the steps in the README.txt file, please do so before anything.
+Otherwise, I hope this HOW TO document will provide you the answers you're looking for
+
+
+
+
+#######################################
+###	HOW TO: Choose the apps that are launched?
+----------------------------------------
+
+Open "GetReadyToWork.py" file and just change "AppsToExecute" array to put there the paths to apps you want
+
+
+
+#######################################
+###	HOW TO: Create the executable ?
+----------------------------------------
+
+If you do not know how to launch a python script or prefer to use an executable file to use it,
+Follow instructions below:
+
+### 1) You'll need either cx_Freeze (and idna) or pyinstaller
+If you do not have any of them installed on your machine, just chose one and refer to the "Using" part below.
+
+#### (A)---------->Using cx_Freeze and idna:
+
+##### Windows:
+
+open a cmd and type:
+pip install cx_Freeze
+pip install idna
+
+##### Linux:
+
+open a terminal and type:
+pip install cx_Freeze
+pip install idna
+
+You will also need to install patchelf to generate the executable:
+To install patchelf in **debian/ubuntu**:
+sudo apt-get install patchelf
+To install patchelf in **fedora**:
+dnf install patchelf
+doc: https://cx-freeze.readthedocs.io/en/latest/installation.html
+
+##### MacOS:
+
+Not researched yet
+
+
+#### (B)---------->Using pyinstaller :
+open a cmd and type:
+pip install -U pyinstaller
+
+
+### 2)From a cmd in the GetReadyToWork foler, simply type
+
+(A)---------->Using cx_Freeze and idna:
+python setup.py build
+Your bundled application should now be available in the "build" folder.
+
+(B)---------->Using pyinstaller 
+pyinstaller GetReadyToWork.py
+Your bundled application should now be available in the "dist" folder.
+
+
+

@@ -1,0 +1,14 @@
+
+# Doc to gitignore
+# https://linuxize.com/post/gitignore-ignoring-files-in-git/#gitignore-patterns
+
+
+#Do not include following folders:
+**/build
+**/dist
+
+
+#Do not include following files:
+/GetReadyToWork.spec
+logs/**
+*.log
