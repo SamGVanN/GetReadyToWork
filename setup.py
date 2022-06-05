@@ -1,6 +1,6 @@
 from cx_Freeze import setup, Executable
 base = None
-executables = [Executable("GetReadyToWork.py", base=base)]
+executables = [Executable("src/GetReadyToWork.py", base=base)]
 
 #Renseignez ici la liste complète des packages utilisés par votre application
 packages = ["idna"]
