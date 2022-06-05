@@ -23,6 +23,8 @@ Feel free to participate in this project with merge requests to make compatibili
 
 ## Launched applications
 
+To launch the python script, install requirements.
+
 To choose the apps that are launched, see "HOW TO.txt"
 
 To create an executable of GetReadyToWork, see "HOW TO.txt"

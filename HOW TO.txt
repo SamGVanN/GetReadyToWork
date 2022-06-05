@@ -14,7 +14,7 @@ Otherwise, I hope this HOW TO document will provide you the answers you're looki
 ----------------------------------------
 
 Open "GetReadyToWork.py" file and just change "AppsToExecute" array to put there the paths to apps you want
-
+On windows, choose from : %ProgramData%\Microsoft\Windows\Start Menu\Programs
 
 
 #######################################
