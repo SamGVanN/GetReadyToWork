@@ -21,8 +21,10 @@ from time import sleep
 
 AppsToExecute = [
     "outlook",
-    f'C:/Users/samue/AppData/Local/Fork/Fork.exe',
-    f"C:\Program Files\Microsoft VS Code\Code.exe",
+    "chrome",
+    # "outlook",
+    # f'C:/Users/samue/AppData/Local/Fork/Fork.exe',
+    # f"C:\Program Files\Microsoft VS Code\Code.exe",
 ]
 
 #OS based method to launch an app
