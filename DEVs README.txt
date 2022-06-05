@@ -12,3 +12,9 @@ https://www.conventionalcommits.org/en/v1.0.0/
 
 If you want to fork this project, feel free to do so and please mention this project :)
 
+
+
+
+
+Logs:
+https://docs.python.org/3/howto/logging.html
