@@ -15,17 +15,23 @@
 # Pour ajouter une application à la liste des app
 # il suffit de l'ajouter dans AppsToExecute avec le chemin de l'application en question 
 
+
 import os, sys, subprocess
 from time import sleep
+
+if sys.platform == "win32":
+        import winapps
+
 
 
 AppsToExecute = [
     "outlook",
-    "chrome",
-    # "outlook",
-    # f'C:/Users/samue/AppData/Local/Fork/Fork.exe',
-    # f"C:\Program Files\Microsoft VS Code\Code.exe",
+    "Opera",
+    "Code",
+    "Fork"
 ]
+
+
 
 #OS based method to launch an app
 def open_file(filename):
@@ -36,6 +42,8 @@ def open_file(filename):
         subprocess.call([opener, filename])
 
 
+
+#region main()
 for app in AppsToExecute:
     sleep(0.5)
     open_file(app)
