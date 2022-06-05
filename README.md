@@ -18,15 +18,25 @@ So it's at the moment at an early stage but maybe it'll stay like that.
 ## COMPATIBLE PLATFORMS
 
 Windows, Linux(WIP*), MacOS(WIP*)
+
+Feel free to participate in this project with merge requests to make compatibility easier, every participation will be welcome.
+
+## Launched applications
+
 To choose the apps that are launched, see "HOW TO.txt"
+
 To create an executable of GetReadyToWork, see "HOW TO.txt"
 
 
-Feel free to participate in this project with merge requests to do make compatibility easier, every participation will be welcome.
 
 
 
-* Work in progress
+---
+Authored by Samuel VANNIER
+
+
+
+\* Work in progress
 
 
 
