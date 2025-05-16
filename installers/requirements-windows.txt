@@ -1,0 +1,9 @@
+cx-Freeze==6.11.0
+idna==3.3
+# pyinstaller==5.1
+winapps==0.2.0
+# Pour Windows : Pillow et pywin32 sont nécessaires pour l'affichage des icônes
+# Pour Linux/Mac : Pillow suffit, l'affichage d'icônes .exe n'est pas supporté
+# requirements-windows.txt
+pillow
+pywin32

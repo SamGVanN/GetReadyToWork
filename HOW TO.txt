@@ -1,4 +1,3 @@
-
 >------------------------------------------------------------------
 >---------------------------	HOW TO	---------------------------
 >------------------------------------------------------------------
@@ -7,71 +6,70 @@ If you have not done the steps in the README.txt file, please do so before anyth
 Otherwise, I hope this HOW TO document will provide you the answers you're looking for
 
 
+#######################################
+###	HOW TO: Choose the applications to launch
+----------------------------------------
+
+Run the configuration program to select the applications to launch:
+
+On Windows:
+    - Double-click ParametrageGetReadyToWork.exe (or run:
+      GetReadyToWork.exe)
+On macOS/Linux:
+    - Run:
+      python3 src/app_configurator/ParametrageGetReadyToWork.py
+
+Use the graphical interface to select the applications to launch (search, manual add).
+The configuration will be saved automatically.
 
 
 #######################################
-###	HOW TO: Choose the apps that are launched?
+###	HOW TO: Install dependencies automatically
 ----------------------------------------
 
-Open "GetReadyToWork.py" file and just change "AppsToExecute" array to put there the paths to apps you want
-On windows, choose from : %ProgramData%\Microsoft\Windows\Start Menu\Programs
+On Windows:
+    - Double-click install-windows.bat or run:
+      .\install-windows.bat
+On Linux/Mac:
+    - Run:
+      bash install-linux-mac.sh
 
 
 #######################################
-###	HOW TO: Create the executable ?
+###	HOW TO: Create the executable
 ----------------------------------------
 
-If you do not know how to launch a python script or prefer to use an executable file to use it,
-Follow instructions below:
+If you do not know how to run a Python script or prefer to use an executable, follow the instructions below:
 
 ### 1) Requirements
 
-You'll need either cx_Freeze (and idna) or pyinstaller
-If you do not have any of them installed on your machine, just chose one and refer to the "Using" part below.
-Or just install requirements
+You will need cx_Freeze (and idna) or pyinstaller
+If you do not have them, install with:
+    pip install cx_Freeze idna
+or
+    pip install -U pyinstaller
 
-#### (A)---------->Using cx_Freeze and idna:
+### 2) Creating the executable
 
-##### Windows:
+From a terminal in the GetReadyToWork folder, type:
 
-open a cmd and type:
-pip install cx_Freeze
-pip install idna
+(A) With cx_Freeze and idna:
+    python setup.py build --build-exe build/v0.0.3
+    The application will be in the "build/v0.0.3" folder.
 
-##### Linux:
-
-open a terminal and type:
-pip install cx_Freeze
-pip install idna
-
-You will also need to install patchelf to generate the executable:
-To install patchelf in **debian/ubuntu**:
-sudo apt-get install patchelf
-To install patchelf in **fedora**:
-dnf install patchelf
-doc: https://cx-freeze.readthedocs.io/en/latest/installation.html
-
-##### MacOS:
-
-Not researched yet
+(B) With pyinstaller:
+    pyinstaller src/app_launcher/GetReadyToWork.py
+    The application will be in the "dist" folder.
 
 
-#### (B)---------->Using pyinstaller :
-open a cmd and type:
-pip install -U pyinstaller
-
-
-### 2) Creating the executable 
-
-From a cmd in the GetReadyToWork foler, simply type
-
-(A)---------->Using cx_Freeze and idna:
-python setup.py build
-Your bundled application should now be available in the "build" folder.
-
-(B)---------->Using pyinstaller 
-pyinstaller GetReadyToWork.py
-Your bundled application should now be available in the "dist" folder.
+#######################################
+###	MULTIPLATFORM NOTES
+----------------------------------------
+- The graphical interface works on Windows, Mac, and Linux.
+- Application icon display is only available on Windows.
+- The install scripts automatically install the required dependencies for your OS.
+- On Windows, for full detection of installed applications, the Python module 'winapps' must be installed (`pip install winapps`).
+- On macOS/Linux, detection uses system standards (Applications, .desktop files, packages).
 
 
 
