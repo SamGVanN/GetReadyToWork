@@ -8,15 +8,23 @@ import locale
 import subprocess
 import threading
 import importlib
-# Always write logs to a file in the same directory as the executable (build or src)
-def get_log_path():
-    if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_dir, 'logs.log')
-logging.basicConfig(filename=get_log_path(), encoding='utf-8', level=logging.DEBUG, force=True)
-logging.debug('Logging initialized at script start.')
+# Ajoute le dossier parent à sys.path pour permettre l'import de common.utils
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    from common.utils import get_log_path, setup_logging
+except ImportError:
+    # En mode frozen, le dossier common est à côté de l'exe
+    import importlib.util
+    import pathlib
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+    utils_path = os.path.join(exe_dir, 'common', 'utils.py')
+    spec = importlib.util.spec_from_file_location('common.utils', utils_path)
+    utils_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(utils_mod)
+    get_log_path = utils_mod.get_log_path
+    setup_logging = utils_mod.setup_logging
+
+setup_logging()
 
 try:
     logging.debug('Starting main import and initialization.')
@@ -35,7 +43,15 @@ try:
     try:
         from config.i18n_resources import messages, messages_fr
     except ImportError:
-        from i18n_resources import messages, messages_fr
+        # En mode frozen, importer dynamiquement i18n_resources.py à côté de l'exe
+        import importlib.util
+        exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+        i18n_path = os.path.join(exe_dir, 'i18n_resources.py')
+        spec = importlib.util.spec_from_file_location('i18n_resources', i18n_path)
+        i18n_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(i18n_mod)
+        messages = i18n_mod.messages
+        messages_fr = i18n_mod.messages_fr
     logging.debug('Imports and i18n loaded.')
     lang = locale.getdefaultlocale()[0]
     if lang and lang.startswith('fr'):
@@ -131,6 +147,10 @@ try:
             self.filtered_apps = self.available_apps.copy()
             self.icons_cache = {}
             self.tooltip = None
+            self.lb_available = None
+            self.lb_selected = None
+            self.vsb_available = None
+            self.vsb_selected = None
             self.create_widgets()
 
         def get_scan_paths(self):
@@ -217,50 +237,84 @@ try:
             style.map('Green.TButton', background=[('active', '#2e8c44')])
 
             main = ttk.Frame(self)
-            main.pack(expand=True, fill='both', padx=30, pady=30)
-
-            # Champ de recherche et bouton sur la même ligne
-            search_frame = ttk.Frame(main)
-            search_frame.grid(row=0, column=0, columnspan=3, sticky='ew', pady=(0, 8))
-            search_label = ttk.Label(search_frame, text=_['search'] if 'search' in _ else 'Rechercher')
-            search_label.pack(side='left', padx=(0, 10))
-            self.search_var = tk.StringVar()
-            self.search_var.trace_add('write', self.on_search)
-            search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=40)
-            search_entry.pack(side='left', padx=(0, 10))
-            edit_btn = ttk.Button(search_frame, text="Modifier les dossiers à scanner", command=self.edit_scan_paths)
-            edit_btn.pack(side='right')
+            main.grid(row=0, column=0, sticky='nsew', padx=24, pady=18)
+            self.rowconfigure(0, weight=1)
+            self.columnconfigure(0, weight=1)
+            main.rowconfigure(1, weight=1)
             main.columnconfigure(0, weight=1)
             main.columnconfigure(1, weight=0)
-            main.columnconfigure(2, weight=0)
+            main.columnconfigure(2, weight=1)
+
+            # --- TITRES AU DESSUS DES ENCADRÉS ---
+            available_label = ttk.Label(main, text=_['available'] if 'available' in _ else 'Applications disponibles', font=("Segoe UI", 11, "bold"), background="#23272e", foreground="#eb8f34")
+            available_label.grid(row=0, column=0, sticky='w', padx=(0, 20), pady=(0, 2))
+            selected_label = ttk.Label(main, text=_['to_launch'] if 'to_launch' in _ else 'Applications à lancer', font=("Segoe UI", 11, "bold"), background="#23272e", foreground="#3dbd5d")
+            selected_label.grid(row=0, column=2, sticky='w', padx=(20, 0), pady=(0, 2))
 
             # Cadres avec contours colorés
             self.frame_available = tk.Frame(main, bg="#23272e", highlightbackground="#eb8f34", highlightcolor="#eb8f34", highlightthickness=2, bd=0)
             self.frame_selected = tk.Frame(main, bg="#23272e", highlightbackground="#3dbd5d", highlightcolor="#3dbd5d", highlightthickness=2, bd=0)
-            self.frame_available.grid(row=1, column=0, sticky='nsew', padx=(0, 20))
-            self.frame_selected.grid(row=1, column=2, sticky='nsew', padx=(20, 0))
+            self.frame_available.grid(row=1, column=0, sticky='nsew', padx=(0, 20), pady=(0,0))
+            self.frame_selected.grid(row=1, column=2, sticky='nsew', padx=(20, 0), pady=(0,0))
+            main.rowconfigure(1, weight=1)
             main.columnconfigure(0, weight=1)
             main.columnconfigure(2, weight=1)
 
-            # Treeview avec treelist par disque
-            self.lb_available = ttk.Treeview(self.frame_available, columns=('name',), show='tree', height=16, selectmode='extended')
-            self.lb_selected = ttk.Treeview(self.frame_selected, columns=('name',), show='tree', height=16, selectmode='extended')
-            self.lb_available.pack(expand=True, fill='both', padx=0, pady=0)
-            self.lb_selected.pack(expand=True, fill='both', padx=0, pady=0)
+            # --- Zone de recherche dans la colonne orange ---
+            search_frame = ttk.Frame(self.frame_available)
+            search_frame.grid(row=0, column=0, columnspan=2, sticky='ew', pady=(8, 8), padx=8)
+            search_label = ttk.Label(search_frame, text=_['search'] if 'search' in _ else 'Rechercher')
+            search_label.pack(side='left', padx=(0, 10))
+            self.search_var = tk.StringVar()
+            self.search_var.trace_add('write', self.on_search)
+            search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=32)
+            search_entry.pack(side='left', padx=(0, 10), fill='x', expand=True)
 
-            # Entêtes
-            self.lb_available.heading('#0', text=_['available'] if 'available' in _ else 'Applications disponibles')
-            self.lb_selected.heading('#0', text=_['to_launch'] if 'to_launch' in _ else 'À lancer')
+            # --- Liste applis + scrollbar ---
+            self.lb_available = ttk.Treeview(self.frame_available, columns=('name',), show='tree', selectmode='extended')
+            self.vsb_available = ttk.Scrollbar(self.frame_available, orient="vertical", command=self.lb_available.yview)
+            self.lb_available.configure(yscrollcommand=self.vsb_available.set)
+            self.frame_available.rowconfigure(0, weight=0)  # zone de recherche
+            self.frame_available.rowconfigure(1, weight=1)  # liste applis
+            self.frame_available.columnconfigure(0, weight=1)
+            self.lb_available.grid(row=1, column=0, sticky='nsew', padx=(8,0), pady=(0,8))
+            self.vsb_available.grid(row=1, column=1, sticky='ns', pady=(0,8), padx=(0,8))
 
-            # Boutons
+            # Treeview + scrollbar pour sélectionnées (utilise grid aussi pour cohérence)
+            self.lb_selected = ttk.Treeview(self.frame_selected, columns=('name',), show='tree', selectmode='extended')
+            self.vsb_selected = ttk.Scrollbar(self.frame_selected, orient="vertical", command=self.lb_selected.yview)
+            self.lb_selected.configure(yscrollcommand=self.vsb_selected.set)
+            self.frame_selected.rowconfigure(0, weight=1)
+            self.frame_selected.columnconfigure(0, weight=1)
+            self.lb_selected.grid(row=0, column=0, sticky='nsew')
+            self.vsb_selected.grid(row=0, column=1, sticky='ns')
+
+            # Bindings scroll souris propres à chaque colonne
+            self.lb_available.bind('<Enter>', lambda e: self._bind_mousewheel(self.lb_available))
+            self.lb_available.bind('<Leave>', lambda e: self._unbind_mousewheel(self.lb_available))
+            self.lb_selected.bind('<Enter>', lambda e: self._bind_mousewheel(self.lb_selected))
+            self.lb_selected.bind('<Leave>', lambda e: self._unbind_mousewheel(self.lb_selected))
+
+            # --- Colonne centrale : flèches + boutons d'action verticaux ---
             btns = ttk.Frame(main)
-            btns.grid(row=1, column=1, sticky='ns')
-            ttk.Button(btns, text='→', command=self.add_app, width=4).pack(pady=10)
-            ttk.Button(btns, text='←', command=self.remove_app, width=4).pack(pady=10)
-            # Nouveau bouton pour choisir manuellement une application
-            manual_btn = ttk.Button(btns, text=_["manual_select"] if "manual_select" in _ else "Choisir manuellement une application", command=self.open_manual_app_selector, width=40)
-            manual_btn.pack(pady=10)
-            ttk.Button(btns, text=_['save'] if 'save' in _ else 'Sauvegarder', command=self.save_selected_apps, width=12, style='Green.TButton').pack(pady=30)
+            btns.grid(row=1, column=1, sticky='ns', pady=(0,0))
+            # Flèches en haut
+            ttk.Button(btns, text='→', command=self.add_app, width=4).pack(pady=(10, 5))
+            ttk.Button(btns, text='←', command=self.remove_app, width=4).pack(pady=(0, 20))
+            # Boutons d'action verticaux
+            edit_btn = ttk.Button(btns, text="Modifier les dossiers à scanner", command=self.edit_scan_paths, width=28)
+            edit_btn.pack(pady=(0, 8), fill='x')
+            manual_btn = ttk.Button(btns, text=_['manual_select'] if 'manual_select' in _ else "Choisir manuellement une application", command=self.open_manual_app_selector, width=28)
+            manual_btn.pack(pady=(0, 8), fill='x')
+            save_btn = ttk.Button(btns, text=_['save'] if 'save' in _ else 'Sauvegarder', command=self.save_selected_apps, style='Green.TButton', width=22)
+            save_btn.pack(pady=(0, 8), fill='x')
+            save_close_btn = ttk.Button(btns, text="Sauvegarder et fermer", command=self._save_and_close, width=22)
+            save_close_btn.pack(pady=(0, 0), fill='x')
+
+            # Frame pour le bouton Sauvegarder en bas
+            save_frame = ttk.Frame(self)
+            save_frame.grid(row=1, column=0, sticky='ew', padx=24, pady=(0, 18))
+            self.rowconfigure(1, weight=0)
 
             # Bindings
             self.lb_available.bind('<Double-Button-1>', lambda e: self.add_app())
@@ -272,6 +326,7 @@ try:
             self.refresh_lists()
 
         def show_loader(self):
+            # Affiche le label de chargement en overlay sans détruire la Treeview ni la scrollbar
             if hasattr(self, 'loader_label') and self.loader_label is not None:
                 return
             self.loader_label = tk.Label(self.frame_available, text="⏳ " + (_['loading'] if 'loading' in _ else 'Chargement...'),
@@ -285,69 +340,42 @@ try:
                 self.loader_label = None
 
         def refresh_lists(self):
-            # Affiche un loader dans la colonne de gauche
-            for widget in self.frame_available.winfo_children():
-                widget.destroy()
-            loader_label = ttk.Label(self.frame_available, text=_['loading'] if 'loading' in _ else 'Chargement...', background="#23272e", foreground="#eb8f34", font=("Segoe UI", 12, "bold"))
-            loader_label.pack(expand=True, fill='both')
-
-            def do_refresh():
-                # Trie par disque puis nom
-                def disk_key(path):
-                    drive = os.path.splitdrive(path)[0].upper()
-                    return (drive, os.path.basename(path).lower())
-                # Liste de gauche (dispo) : treelist par disque
-                available_items = []
-                drives = {}
-                for app in sorted(self.filtered_apps, key=disk_key):
-                    drive = os.path.splitdrive(app)[0].upper()
-                    if drive not in drives:
-                        drives[drive] = {'id': drive, 'children': []}
-                    name = os.path.basename(app)
-                    drives[drive]['children'].append({'name': name, 'path': app})
-                available_items = drives
-                # Liste de droite (choisies) : treelist par disque
-                drives_sel = {}
-                for app in sorted(self.selected_apps, key=disk_key):
-                    drive = os.path.splitdrive(app)[0].upper()
-                    if drive not in drives_sel:
-                        drives_sel[drive] = {'id': drive, 'children': []}
-                    name = os.path.basename(app)
-                    drives_sel[drive]['children'].append({'name': name, 'path': app})
-                selected_items = drives_sel
-                def update_ui():
-                    # Supprime le loader
-                    for widget in self.frame_available.winfo_children():
-                        widget.destroy()
-                    # Treeview avec treelist par disque
-                    self.lb_available = ttk.Treeview(self.frame_available, columns=('name',), show='tree', height=16, selectmode='extended')
-                    self.lb_available.pack(expand=True, fill='both', padx=0, pady=0)
-                    self.lb_available.heading('#0', text=_['available'] if 'available' in _ else 'Applications disponibles')
-                    # Ajoute les apps disponibles
-                    for drive, data in available_items.items():
-                        parent = self.lb_available.insert('', 'end', text=drive if drive else '(?)', open=True)
-                        for child in data['children']:
-                            self.lb_available.insert(parent, 'end', text=child['name'], tags=(child['path'],))
-                    # Bindings
-                    self.lb_available.bind('<Double-Button-1>', lambda e: self.add_app())
-                    self.lb_available.bind('<Motion>', self.on_treeview_hover)
-                    # Colonne de droite
-                    for widget in self.frame_selected.winfo_children():
-                        widget.destroy()
-                    self.lb_selected = ttk.Treeview(self.frame_selected, columns=('name',), show='tree', height=16, selectmode='extended')
-                    self.lb_selected.pack(expand=True, fill='both', padx=0, pady=0)
-                    self.lb_selected.heading('#0', text=_['to_launch'] if 'to_launch' in _ else 'À lancer')
-                    for drive, data in selected_items.items():
-                        parent = self.lb_selected.insert('', 'end', text=drive if drive else '(?)', open=True)
-                        for child in data['children']:
-                            self.lb_selected.insert(parent, 'end', text=child['name'], tags=(child['path'],))
-                    self.lb_selected.bind('<Double-Button-1>', lambda e: self.remove_app())
-                    self.lb_selected.bind('<Motion>', self.on_treeview_hover)
-
-                self.after(0, update_ui)
-
-            # Lance le rafraîchissement dans un thread pour ne pas bloquer l'UI
-            threading.Thread(target=do_refresh, daemon=True).start()
+            # Vide le contenu des Treeview sans les détruire
+            for tree in (self.lb_available, self.lb_selected):
+                tree.delete(*tree.get_children())
+            # Trie par disque puis nom
+            def disk_key(path):
+                drive = os.path.splitdrive(path)[0].upper()
+                return (drive, os.path.basename(path).lower())
+            # Liste de gauche (dispo) : treelist par disque
+            drives = {}
+            for app in sorted(self.filtered_apps, key=disk_key):
+                drive = os.path.splitdrive(app)[0].upper()
+                if drive not in drives:
+                    drives[drive] = {'id': drive, 'children': []}
+                name = os.path.basename(app)
+                drives[drive]['children'].append({'name': name, 'path': app})
+            for drive, data in drives.items():
+                parent = self.lb_available.insert('', 'end', text=drive if drive else '(?)', open=True)
+                for child in data['children']:
+                    self.lb_available.insert(parent, 'end', text=child['name'], tags=(child['path'],))
+            # Liste de droite (choisies) : treelist par disque
+            drives_sel = {}
+            for app in sorted(self.selected_apps, key=disk_key):
+                drive = os.path.splitdrive(app)[0].upper()
+                if drive not in drives_sel:
+                    drives_sel[drive] = {'id': drive, 'children': []}
+                name = os.path.basename(app)
+                drives_sel[drive]['children'].append({'name': name, 'path': app})
+            for drive, data in drives_sel.items():
+                parent = self.lb_selected.insert('', 'end', text=drive if drive else '(?)', open=True)
+                for child in data['children']:
+                    self.lb_selected.insert(parent, 'end', text=child['name'], tags=(child['path'],))
+            # Rebinds
+            self.lb_available.bind('<Double-Button-1>', lambda e: self.add_app())
+            self.lb_available.bind('<Motion>', self.on_treeview_hover)
+            self.lb_selected.bind('<Double-Button-1>', lambda e: self.remove_app())
+            self.lb_selected.bind('<Motion>', self.on_treeview_hover)
 
         def on_search(self, *args):
             query = self.search_var.get().lower()
@@ -479,25 +507,22 @@ try:
                 var = tk.StringVar(value=path)
                 var_list.append(var)
             refresh_entries()
-            ttk.Button(win, text=_["add_path"] if "add_path" in _ else "Ajouter un chemin", command=add_path).pack(pady=(0, 10))
-            ttk.Button(win, text=_["reset_to_default"] if "reset_to_default" in _ else "Reset to default", command=reset_to_default).pack(pady=(0, 10))
+            ttk.Button(win, text=_["add_path"] if "add_path" in _ else "Ajouter un chemin", command=add_path, width=22).pack(pady=(0, 10))
+            ttk.Button(win, text=_["reset_to_default"] if "reset_to_default" in _ else "Reset to default", command=reset_to_default, width=22).pack(pady=(0, 10))
             def save_and_close():
                 new_paths = [v.get() for v in var_list if v.get().strip()]
                 self.save_scan_paths(new_paths)
                 self.scan_path_window = None
                 win.destroy()
-                # Affiche le loader immédiatement
-                for widget in self.frame_available.winfo_children():
-                    widget.destroy()
-                loader_label = ttk.Label(self.frame_available, text=_["loading"] if "loading" in _ else "Chargement...", background="#23272e", foreground="#eb8f34", font=("Segoe UI", 12, "bold"))
-                loader_label.pack(expand=True, fill='both')
+                # Affiche le loader sans détruire les widgets existants
+                self.show_loader()
                 # Recherche des apps dans un thread pour ne pas bloquer l'UI
                 def update_apps():
                     self.available_apps = self.find_installed_apps()
                     self.filtered_apps = self.available_apps.copy()
-                    self.after(0, self.refresh_lists)
+                    self.after(0, lambda: (self.hide_loader(), self.refresh_lists()))
                 threading.Thread(target=update_apps, daemon=True).start()
-            ttk.Button(win, text=_["save_paths"] if "save_paths" in _ else "Sauvegarder", command=save_and_close, style='Green.TButton').pack(pady=10)
+            ttk.Button(win, text=_["save_paths"] if "save_paths" in _ else "Sauvegarder", command=save_and_close, style='Green.TButton', width=22).pack(pady=10)
 
         def open_manual_app_selector(self):
             # Ouvre une fenêtre listant toutes les applis installées sur l'OS, indépendamment des dossiers à scanner
@@ -562,6 +587,29 @@ try:
                     ttk.Button(win, text=_["manual_select_add"] if "manual_select_add" in _ else "Ajouter à la sélection", command=add_selected, style='Green.TButton').pack(pady=10)
                 self.after(0, show_ui)
             threading.Thread(target=load_and_show, daemon=True).start()
+
+        def _on_mousewheel(self, event, tree):
+            # Compatible Windows/Mac/Linux
+            if event.num == 5 or event.delta == -120:
+                tree.yview_scroll(1, "units")
+            elif event.num == 4 or event.delta == 120:
+                tree.yview_scroll(-1, "units")
+            return "break"
+
+        def _bind_mousewheel(self, tree):
+            # Bind la molette uniquement à ce treeview
+            tree.bind_all('<MouseWheel>', lambda e: self._on_mousewheel(e, tree))
+            tree.bind_all('<Button-4>', lambda e: self._on_mousewheel(e, tree))
+            tree.bind_all('<Button-5>', lambda e: self._on_mousewheel(e, tree))
+
+        def _unbind_mousewheel(self, tree):
+            tree.unbind_all('<MouseWheel>')
+            tree.unbind_all('<Button-4>')
+            tree.unbind_all('<Button-5>')
+
+        def _save_and_close(self):
+            self.save_selected_apps()
+            self.destroy()
 
     if __name__ == '__main__':
         def log_tkinter_exception(type, value, tb):

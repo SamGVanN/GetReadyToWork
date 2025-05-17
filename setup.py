@@ -20,6 +20,8 @@ include_files = [
     ("src/config/scan_paths_user.json", "scan_paths_user.json"),
     ("runtime/default.json", "default.json"),
     ("runtime/apps_to_launch.json", "apps_to_launch.json"),
+    ("src/common/utils.py", "common/utils.py"),  # Seul utils.py dans un dossier common
+    ("src/common/__init__.py", "common/__init__.py"),  # Pour que common soit un package
 ]
 
 options = {

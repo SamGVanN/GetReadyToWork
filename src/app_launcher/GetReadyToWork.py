@@ -24,6 +24,20 @@ import json
 from time import sleep
 from datetime import datetime
 import importlib
+# Ajoute le dossier parent à sys.path pour permettre l'import de common.utils
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    from common.utils import get_log_path, setup_logging
+except ImportError:
+    # En mode frozen, le dossier common est à côté de l'exe
+    import importlib.util
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+    utils_path = os.path.join(exe_dir, 'common', 'utils.py')
+    spec = importlib.util.spec_from_file_location('common.utils', utils_path)
+    utils_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(utils_mod)
+    get_log_path = utils_mod.get_log_path
+    setup_logging = utils_mod.setup_logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'config')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src')))
@@ -60,16 +74,7 @@ if lang and lang.startswith('fr'):
 else:
     _ = messages
 
-# Always write logs to a file in the same directory as the executable (build or src)
-def get_log_path():
-    if getattr(sys, 'frozen', False):
-        # Running as a bundled exe
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_dir, 'logs.log')
-
-logging.basicConfig(filename=get_log_path(), encoding='utf-8', level=logging.DEBUG, force=True)
+setup_logging()
 
 # Robustly resolve runtime directory for config files
 if getattr(sys, 'frozen', False):

@@ -1,4 +1,3 @@
-
 # Doc to gitignore
 # https://linuxize.com/post/gitignore-ignoring-files-in-git/#gitignore-patterns
 
@@ -12,3 +11,8 @@
 /GetReadyToWork.spec
 logs/**
 *.log
+
+
+# Ignore all __pycache__ folders anywhere in the project
+**/__pycache__/
+*.pyc
