@@ -21,6 +21,7 @@ include_files = [
     ("runtime/default.json", "default.json"),
     ("runtime/apps_to_launch.json", "apps_to_launch.json"),
     ("src/common/utils.py", "common/utils.py"),  # Seul utils.py dans un dossier common
+    ("src/common/config_manager.py", "common/config_manager.py"),  # Ajouté pour centraliser la gestion de config
     ("src/common/__init__.py", "common/__init__.py"),  # Pour que common soit un package
 ]
 

@@ -1,5 +1,16 @@
 # Changelog / Notes de version
 
+## [0.0.4] - 2025-05-18
+### Refactor & Robustification
+- Refactor complet de la structure du projet pour robustesse et maintenabilité.
+- Séparation du code GUI dans `src/app_configurator/GUI.py`.
+- Centralisation de la gestion des fichiers de configuration dans `src/common/config_manager.py`.
+- Tous les utilitaires partagés sont dans `src/common/utils.py`.
+- Les imports sont robustes et compatibles mode script/module et mode exécutable (frozen).
+- Le build cx_Freeze inclut tous les fichiers nécessaires (`common/`, etc.) pour les deux exécutables.
+- Les instructions d'exécution recommandent désormais `python -m ...` pour le développement.
+- README et setup.py mis à jour pour refléter la nouvelle structure et les bonnes pratiques.
+
 ## [0.0.3] - 2025-05-16
 
 ### Nouveautés et améliorations majeures

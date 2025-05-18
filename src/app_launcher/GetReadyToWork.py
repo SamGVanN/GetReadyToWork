@@ -24,6 +24,7 @@ import json
 from time import sleep
 from datetime import datetime
 import importlib
+from common.config_manager import load_config
 # Ajoute le dossier parent à sys.path pour permettre l'import de common.utils
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 try:
@@ -86,16 +87,7 @@ else:
 # Ensure runtime directory exists (for writing, if needed)
 os.makedirs(runtime_dir, exist_ok=True)
 
-CONFIG_FILE = os.path.join(runtime_dir, 'apps_to_launch.json')
-DEFAULT_FILE = os.path.join(runtime_dir, 'default.json')
-if os.path.exists(CONFIG_FILE):
-    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-        AppsToExecute = json.load(f)
-elif os.path.exists(DEFAULT_FILE):
-    with open(DEFAULT_FILE, 'r', encoding='utf-8') as f:
-        AppsToExecute = json.load(f)
-else:
-    AppsToExecute = ["outlook"]
+AppsToExecute = load_config()
 
 def open_file(appName):
     if sys.platform == "win32":

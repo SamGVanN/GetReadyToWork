@@ -45,23 +45,33 @@ GetReadyToWork lets you launch your favorite applications in one click, with a m
    - `python src/app_launcher/GetReadyToWork.py` (launcher)
    - `python src/app_configurator/ParametrageGetReadyToWork.py` (configuration)
 
-## Important Notes
-- **Windows**: For full detection of installed applications, the Python module `winapps` must be installed (`pip install winapps`).
-- **macOS/Linux**: Detection uses system standards (Applications, .desktop files, packages).
-- User configuration files are in the `runtime/` folder.
+## Usage
 
-## Recommended Structure
-```
-GetReadyToWork/
-├── src/                # Python source code
-├── runtime/            # User config/data files
-├── installers/         # Install scripts and requirements
-├── build/              # Build artifacts (should be gitignored)
-├── setup.py, README.md, ...
-```
+### Recommended (development):
+- **Launcher:**
+  - `python -m src.app_launcher.GetReadyToWork`
+- **Configuration GUI:**
+  - `python -m src.app_configurator.ParametrageGetReadyToWork`
 
-## Changelog
-See `CHANGELOG.md` for the full list of features and fixes.
+### Frozen executables (Windows):
+- `GetReadyToWork.exe` (main launcher)
+- `ParametrageGetReadyToWork.exe` (configuration GUI)
+
+## Project Structure
+- `src/app_launcher/` : Main launcher app (`GetReadyToWork.py`)
+- `src/app_configurator/` : GUI for selecting/configuring apps to launch (`ParametrageGetReadyToWork.py`, `GUI.py`)
+- `src/common/` : Shared modules/utilities (`utils.py`, `config_manager.py`)
+- `src/config/` : Configuration and resource files (i18n, etc.)
+- `src/runtime/` : User config and runtime-generated files (`apps_to_launch.json`, logs, etc.)
+
+## Configuration Management
+- All configuration file access is centralized in `src/common/config_manager.py`.
+- All shared utilities are in `src/common/utils.py`.
+- GUI code is in `src/app_configurator/GUI.py`.
+
+## Notes
+- For full detection of installed applications on Windows, the Python module `winapps` must be installed (`pip install winapps`).
+- See `HOW TO.txt` for build instructions and advanced usage.
 
 ---
 
