@@ -13,11 +13,9 @@ Otherwise, I hope this HOW TO document will provide you the answers you're looki
 Run the configuration program to select the applications to launch:
 
 On Windows:
-    - Double-click ParametrageGetReadyToWork.exe (or run:
-      GetReadyToWork.exe)
+    - Double-click ParametrageGetReadyToWork.exe (or GetReadyToWork.exe)
 On macOS/Linux:
-    - Run:
-      python3 src/app_configurator/ParametrageGetReadyToWork.py
+    - Double-click ParametrageGetReadyToWork (or GetReadyToWork) in the dist/ folder
 
 Use the graphical interface to select the applications to launch (search, manual add).
 The configuration will be saved automatically.
@@ -27,39 +25,34 @@ The configuration will be saved automatically.
 ###	HOW TO: Install dependencies automatically
 ----------------------------------------
 
-On Windows:
-    - Double-click install-windows.bat or run:
-      .\install-windows.bat
-On Linux/Mac:
-    - Run:
-      bash install-linux-mac.sh
+End users do NOT need to install Python or any dependencies. Just use the provided executable for your OS.
+
+If you are a developer or want to build the app yourself, see below.
 
 
 #######################################
-###	HOW TO: Create the executable
+###	HOW TO: Create the executable (for developers/maintainers)
 ----------------------------------------
 
-If you do not know how to run a Python script or prefer to use an executable, follow the instructions below:
+You can build the application for your platform using the provided scripts. This will generate standalone executables/binaries that do NOT require Python to be installed for end users.
 
 ### 1) Requirements
+- Python 3.8+
+- PyInstaller (pip install pyinstaller)
 
-You will need cx_Freeze (and idna) or pyinstaller
-If you do not have them, install with:
-    pip install cx_Freeze idna
-or
-    pip install -U pyinstaller
+### 2) Building for your platform
 
-### 2) Creating the executable
+On Windows:
+    - Run: build-windows.bat
+    - The .exe files will be in the dist\ folder.
 
-From a terminal in the GetReadyToWork folder, type:
+On Linux:
+    - Run: bash build-linux.sh
+    - The binaries will be in the dist/ folder.
 
-(A) With cx_Freeze and idna:
-    python setup.py build --build-exe build/v0.0.3
-    The application will be in the "build/v0.0.3" folder.
-
-(B) With pyinstaller:
-    pyinstaller src/app_launcher/GetReadyToWork.py
-    The application will be in the "dist" folder.
+On macOS:
+    - Run: bash build-mac.sh
+    - The binaries will be in the dist/ folder.
 
 
 #######################################
@@ -67,9 +60,9 @@ From a terminal in the GetReadyToWork folder, type:
 ----------------------------------------
 - The graphical interface works on Windows, Mac, and Linux.
 - Application icon display is only available on Windows.
-- The install scripts automatically install the required dependencies for your OS.
-- On Windows, for full detection of installed applications, the Python module 'winapps' must be installed (`pip install winapps`).
+- On Windows, for full detection of installed applications, the Python module 'winapps' must be included (already bundled in the .exe).
 - On macOS/Linux, detection uses system standards (Applications, .desktop files, packages).
+- End users do NOT need to use Python or the terminal: just run the provided executable for your OS.
 
 
 

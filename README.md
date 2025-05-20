@@ -15,68 +15,43 @@ GetReadyToWork lets you launch your favorite applications in one click, with a m
 - **Modern and responsive UI** (loader during scans, robust error handling, etc.)
 - **Robust configuration** (auto-save, per-OS scan paths)
 
-## Installation
+## Quick Start
 
-### Prerequisites
-- Python 3.10+ (for source version)
-- [winapps](https://pypi.org/project/winapps/) (Windows only, for full detection of installed applications)
+### Requirements
+- Python 3.10+
+- (Windows only) `pip install winapps` for full app detection
 
-### Using the Installer (Recommended)
-1. Download the release archive for your OS (`build/v0.0.3/` folder or `.zip` from GitHub Releases)
-2. Extract it wherever you want
-3. If you want to generate the executables folder yourself, run:
-   - **Windows:** `python setup.py build --build-exe build/v0.0.3`
-   - **macOS/Linux:** `python3 setup.py build --build-exe build/latest`
-   - The generated executables will be in the `build/v0.0.3` (Windows) or `build/latest` (macOS/Linux) folder. On macOS/Linux, you may need to make the file executable with `chmod +x build/latest/GetReadyToWork` and run it with `./GetReadyToWork`.
-4. Run the appropriate launcher for your OS:
-   - **Windows:** `GetReadyToWork.exe` or `ParametrageGetReadyToWork.exe`
-   - **macOS/Linux:**
-     - `python3 src/app_launcher/GetReadyToWork.py` (launcher)
-     - `python3 src/app_configurator/ParametrageGetReadyToWork.py` (configuration)
-     - Or run the generated executable from `build/latest/` if you built it as above.
-
-### From Source
-1. Clone the repository
+### Local Launch (Development)
+1. Clone this repository
 2. Install dependencies:
    - Windows: `pip install -r installers/requirements-windows.txt`
    - Linux/Mac: `pip install -r installers/requirements-linux.txt`
-   - (On Windows, also run: `pip install winapps`)
-3. Run:
-   - `python src/app_launcher/GetReadyToWork.py` (launcher)
-   - `python src/app_configurator/ParametrageGetReadyToWork.py` (configuration)
+   - On Windows, also run: `pip install winapps`
+3. Launch the apps:
+   - **Launcher:**
+     - `python -m src.app_launcher.GetReadyToWork`
+   - **Configuration GUI:**
+     - `python -m src.app_configurator.ParametrageGetReadyToWork`
 
-## Usage
-
-### Recommended (development):
-- **Launcher:**
-  - `python -m src.app_launcher.GetReadyToWork`
-- **Configuration GUI:**
-  - `python -m src.app_configurator.ParametrageGetReadyToWork`
-
-### Frozen executables (Windows):
-- `GetReadyToWork.exe` (main launcher)
-- `ParametrageGetReadyToWork.exe` (configuration GUI)
+### Usage
+- Use the configuration GUI to select and organize the applications you want to launch.
+- The launcher will start all selected apps in one click.
+- All configuration is saved in the `runtime/` folder.
 
 ## Project Structure
-- `src/app_launcher/` : Main launcher app (`GetReadyToWork.py`)
-- `src/app_configurator/` : GUI for selecting/configuring apps to launch (`ParametrageGetReadyToWork.py`, `GUI.py`)
-- `src/common/` : Shared modules/utilities (`utils.py`, `config_manager.py`)
-- `src/config/` : Configuration and resource files (i18n, etc.)
-- `src/runtime/` : User config and runtime-generated files (`apps_to_launch.json`, logs, etc.)
+- `src/app_launcher/` : Main launcher (`GetReadyToWork.py`)
+- `src/app_configurator/` : Configuration GUI (`ParametrageGetReadyToWork.py`, `GUI.py`)
+- `src/common/` : Shared utilities
+- `src/config/` : i18n and scan path resources
+- `src/runtime/` : User config and runtime files
 
-## Configuration Management
-- All configuration file access is centralized in `src/common/config_manager.py`.
-- All shared utilities are in `src/common/utils.py`.
-- GUI code is in `src/app_configurator/GUI.py`.
-
-## Notes
-- For full detection of installed applications on Windows, the Python module `winapps` must be installed (`pip install winapps`).
-- See `HOW TO.txt` for build instructions and advanced usage.
+## Packaging (for maintainers)
+- Use the provided build scripts (`tools/build-windows.bat`, `tools/build-linux.sh`, `tools/build-mac.sh`) to create standalone executables with PyInstaller.
+- Release folders (`release-windows/`, `release-linux/`, `release-mac/`) are generated automatically and should not be committed.
 
 ---
 
-**For questions or contributions, open an issue or pull request on GitHub!**
-
+For questions or contributions, open an issue or pull request on GitHub.
 
 ---
 Authored by Samuel VANNIER

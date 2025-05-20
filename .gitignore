@@ -16,3 +16,10 @@ logs/**
 # Ignore all __pycache__ folders anywhere in the project
 **/__pycache__/
 *.pyc
+
+
+# Ignore release folders for all platforms
+release-windows/
+release-linux/
+release-mac/
+release-windows.zip

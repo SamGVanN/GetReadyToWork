@@ -1,10 +1,42 @@
+import os
+import sys
+import json
+import threading
+import locale
+import subprocess
+import importlib
+import importlib.util
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-import os
-import json
-import importlib
-import threading
-import sys
+
+# Initialisation du logging commun dès le lancement du module
+try:
+    # Essai import absolu (mode dev, script, ou frozen)
+    from src.common.utils import setup_logging
+except Exception:
+    try:
+        from common.utils import setup_logging
+    except Exception:
+        try:
+            # Essai import dynamique (mode frozen)
+            exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+            utils_path = os.path.join(exe_dir, 'common', 'utils.py')
+            if not os.path.exists(utils_path):
+                # fallback build/latest/common/utils.py
+                utils_path = os.path.join(os.path.dirname(__file__), '..', '..', 'common', 'utils.py')
+            spec = importlib.util.spec_from_file_location('common.utils', utils_path)
+            utils_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(utils_mod)
+            setup_logging = utils_mod.setup_logging
+        except Exception as e:
+            import logging
+            logging.basicConfig(filename='logs.log', level=logging.ERROR, format='%(asctime)s %(levelname)s %(message)s')
+            logging.error(f"[FATAL] Impossible d'importer setup_logging: {e}")
+            raise
+setup_logging()
+import logging
+logging.info('--- Lancement module GUI.py ---')
+
 # --- Début correctif robustesse et i18n ---
 try:
     import locale
@@ -50,7 +82,22 @@ except Exception:
 # --- Fin correctif robustesse et i18n ---
 
 # --- Définition des chemins de config robustes ---
-from ..common.config_manager import get_config_file, get_scan_paths_file
+try:
+    from src.common.config_manager import get_config_file, get_scan_paths_file
+except Exception:
+    try:
+        from common.config_manager import get_config_file, get_scan_paths_file
+    except Exception:
+        import importlib.util
+        exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+        cm_path = os.path.join(exe_dir, 'common', 'config_manager.py')
+        if not os.path.exists(cm_path):
+            cm_path = os.path.join(os.path.dirname(__file__), '..', '..', 'common', 'config_manager.py')
+        spec = importlib.util.spec_from_file_location('common.config_manager', cm_path)
+        cm_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cm_mod)
+        get_config_file = cm_mod.get_config_file
+        get_scan_paths_file = cm_mod.get_scan_paths_file
 CONFIG_FILE = get_config_file()
 SCAN_PATHS_USER_FILE = get_scan_paths_file()
 
@@ -128,32 +175,52 @@ class AppConfigurator(tk.Tk):
         self.vsb_selected = None
         self.create_widgets()
 
+    def _get_default_scan_paths(self):
+        """Robustly load the default scan paths for the current OS, compatible with both dev and frozen modes."""
+        import importlib.util
+        import sys
+        import os
+        scan_filename = None
+        if sys.platform.startswith('win'):
+            scan_filename = 'scan_paths_windows.py'
+        elif sys.platform.startswith('darwin'):
+            scan_filename = 'scan_paths_mac.py'
+        else:
+            scan_filename = 'scan_paths_linux.py'
+        # Try frozen mode (PyInstaller)
+        try:
+            if getattr(sys, 'frozen', False):
+                exe_dir = os.path.dirname(sys.executable)
+                scan_path = os.path.join(exe_dir, scan_filename)
+                if not os.path.exists(scan_path):
+                    # Try sys._MEIPASS if available
+                    scan_path = os.path.join(getattr(sys, '_MEIPASS', exe_dir), scan_filename)
+                if not os.path.exists(scan_path):
+                    # Fallback to config subdir (for one-folder mode)
+                    scan_path = os.path.join(exe_dir, 'config', scan_filename)
+            else:
+                # Dev mode: src/config
+                scan_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config', scan_filename))
+            spec = importlib.util.spec_from_file_location('scan_paths', scan_path)
+            scan_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(scan_mod)
+            return list(scan_mod.SCAN_PATHS)
+        except Exception as e:
+            logging.error(f"Error loading default scan paths ({scan_filename}): {e}")
+            return []
+
     def get_scan_paths(self):
         # Charge les paths depuis un fichier de config utilisateur, sinon charge les valeurs par défaut selon l'OS
         if os.path.exists(SCAN_PATHS_USER_FILE):
             try:
                 with open(SCAN_PATHS_USER_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    paths = json.load(f)
+                    if paths:  # If not empty, use them
+                        return paths
             except Exception as e:
                 logging.error(f"Error loading user scan paths: {e}")
-        # Fallback: charge les chemins par défaut selon l'OS
-        try:
-            if sys.platform.startswith('win'):
-                module_names = ['config.scan_paths_windows', 'scan_paths_windows']
-            elif sys.platform.startswith('darwin'):
-                module_names = ['config.scan_paths_mac', 'scan_paths_mac']
-            else:
-                module_names = ['config.scan_paths_linux', 'scan_paths_linux']
-            for mod_name in module_names:
-                try:
-                    mod = importlib.import_module(mod_name)
-                    return mod.SCAN_PATHS
-                except ImportError:
-                    continue
-            raise ImportError(f"Could not import scan paths module for OS: {sys.platform}")
-        except Exception as e:
-            logging.error(f"Error loading default scan paths: {e}")
-            return []
+        # Fallback: robust default scan paths
+        return self._get_default_scan_paths()
 
     def save_scan_paths(self, paths):
         try:
@@ -166,17 +233,39 @@ class AppConfigurator(tk.Tk):
     def find_installed_apps(self):
         apps = []
         scan_paths = self.get_scan_paths()
-        for root in scan_paths:
-            if root and os.path.exists(root):
-                for dirpath, dirnames, filenames in os.walk(root):
-                    for f in filenames:
-                        if f.lower().endswith('.exe'):
-                            apps.append(os.path.join(dirpath, f))
-        # Trie par disque puis nom
+        for root_path in scan_paths: # Renamed root to root_path for clarity
+            if root_path and os.path.exists(root_path):
+                for dirpath, dirnames, filenames in os.walk(root_path):
+                    if sys.platform.startswith('win'):
+                        for f in filenames:
+                            if f.lower().endswith('.exe'):
+                                apps.append(os.path.join(dirpath, f))
+                    elif sys.platform.startswith('darwin'):
+                        for d_name in dirnames: # Iterate over directories for .app bundles
+                            if d_name.lower().endswith('.app'):
+                                apps.append(os.path.join(dirpath, d_name))
+                                dirnames.remove(d_name) # Avoid redundant walk into .app bundle
+                        # Optionally, could check 'filenames' for command-line executables if desired
+                    else: # Linux and other OS
+                        for f in filenames:
+                            file_path = os.path.join(dirpath, f)
+                            # Check for executable permission and ensure it's a file, not a directory
+                            if os.access(file_path, os.X_OK) and not os.path.isdir(file_path):
+                                apps.append(file_path)
+        
+        # Platform-aware sorting key
         def disk_key(path):
-            drive = os.path.splitdrive(path)[0].upper()
-            return (drive, os.path.basename(path).lower())
-        return sorted(set(apps), key=disk_key)
+            path_lower = path.lower()
+            basename_lower = os.path.basename(path_lower)
+            if sys.platform.startswith('win'):
+                drive = os.path.splitdrive(path_lower)[0].upper()
+                return (drive, basename_lower)
+            else: # For macOS and Linux, sort by base path then app name
+                # Ensure consistent sorting for paths like /Applications/AppName.app
+                # and /usr/bin/appname
+                dirname_lower = os.path.dirname(path_lower)
+                return (dirname_lower, basename_lower)
+        return sorted(list(set(apps)), key=disk_key) # Use list(set(apps)) to remove duplicates before sorting
 
     def load_selected_apps(self):
         if os.path.exists(CONFIG_FILE):
@@ -318,34 +407,50 @@ class AppConfigurator(tk.Tk):
         # Vide le contenu des Treeview sans les détruire
         for tree in (self.lb_available, self.lb_selected):
             tree.delete(*tree.get_children())
-        # Trie par disque puis nom
-        def disk_key(path):
-            drive = os.path.splitdrive(path)[0].upper()
-            return (drive, os.path.basename(path).lower())
-        # Liste de gauche (dispo) : treelist par disque
-        drives = {}
-        for app in sorted(self.filtered_apps, key=disk_key):
-            drive = os.path.splitdrive(app)[0].upper()
-            if drive not in drives:
-                drives[drive] = {'id': drive, 'children': []}
-            name = os.path.basename(app)
-            drives[drive]['children'].append({'name': name, 'path': app})
-        for drive, data in drives.items():
-            parent = self.lb_available.insert('', 'end', text=drive if drive else '(?)', open=True)
-            for child in data['children']:
-                self.lb_available.insert(parent, 'end', text=child['name'], tags=(child['path'],))
-        # Liste de droite (choisies) : treelist par disque
-        drives_sel = {}
-        for app in sorted(self.selected_apps, key=disk_key):
-            drive = os.path.splitdrive(app)[0].upper()
-            if drive not in drives_sel:
-                drives_sel[drive] = {'id': drive, 'children': []}
-            name = os.path.basename(app)
-            drives_sel[drive]['children'].append({'name': name, 'path': app})
-        for drive, data in drives_sel.items():
-            parent = self.lb_selected.insert('', 'end', text=drive if drive else '(?)', open=True)
-            for child in data['children']:
-                self.lb_selected.insert(parent, 'end', text=child['name'], tags=(child['path'],))
+        # Platform-aware sorting key (defined in find_installed_apps, but conceptually used here too for sorting before display)
+        def get_group_key(path):
+            if sys.platform.startswith('win'):
+                return os.path.splitdrive(path)[0].upper() or "(C:)" # Default if no drive
+            else: # Group by parent directory for macOS/Linux
+                return os.path.dirname(path) or "/" # Default if root
+
+        # Liste de gauche (dispo) : treelist par groupe (disque ou dossier parent)
+        groups_available = {}
+        # Use the same disk_key from find_installed_apps for sorting to ensure consistency
+        # The disk_key function sorts by (group, name)
+        for app_path in self.filtered_apps: # self.filtered_apps is already sorted by disk_key
+            group_name = get_group_key(app_path)
+            if group_name not in groups_available:
+                groups_available[group_name] = []
+            groups_available[group_name].append({'name': os.path.basename(app_path), 'path': app_path})
+
+        for group_name in sorted(groups_available.keys()):
+            parent = self.lb_available.insert('', 'end', text=group_name, open=True)
+            for child_app in sorted(groups_available[group_name], key=lambda x: x['name'].lower()):
+                self.lb_available.insert(parent, 'end', text=child_app['name'], tags=(child_app['path'],))
+
+        # Liste de droite (choisies) : treelist par groupe
+        groups_selected = {}
+        # self.selected_apps should also be sorted before display grouping
+        # We can sort it using the disk_key from find_installed_apps if it's not already
+        # For simplicity, assume self.selected_apps might not be pre-sorted like self.filtered_apps
+        # However, the disk_key in find_installed_apps is not directly accessible here.
+        # Re-define a simple sort key for selected_apps for now or ensure it's sorted upon modification.
+        
+        # Let's re-use get_group_key and sort selected_apps locally for grouping
+        # Create a temporary sorted list for selected apps for display grouping
+        temp_sorted_selected_apps = sorted(self.selected_apps, key=lambda app_path: (get_group_key(app_path), os.path.basename(app_path).lower()))
+
+        for app_path in temp_sorted_selected_apps:
+            group_name_sel = get_group_key(app_path)
+            if group_name_sel not in groups_selected:
+                groups_selected[group_name_sel] = []
+            groups_selected[group_name_sel].append({'name': os.path.basename(app_path), 'path': app_path})
+            
+        for group_name_sel in sorted(groups_selected.keys()):
+            parent = self.lb_selected.insert('', 'end', text=group_name_sel, open=True)
+            for child_app in sorted(groups_selected[group_name_sel], key=lambda x: x['name'].lower()):
+                self.lb_selected.insert(parent, 'end', text=child_app['name'], tags=(child_app['path'],))
         # Rebinds
         self.lb_available.bind('<Double-Button-1>', lambda e: self.add_app())
         self.lb_available.bind('<Motion>', self.on_treeview_hover)
@@ -453,23 +558,9 @@ class AppConfigurator(tk.Tk):
             del var_list[idx]
             refresh_entries()
         def reset_to_default():
-            # Recharge les chemins par défaut selon l'OS
+            # Recharge les chemins par défaut selon l'OS, robustement (dev/frozen)
             try:
-                if sys.platform.startswith('win'):
-                    module_names = ['config.scan_paths_windows', 'scan_paths_windows']
-                elif sys.platform.startswith('darwin'):
-                    module_names = ['config.scan_paths_mac', 'scan_paths_mac']
-                else:
-                    module_names = ['config.scan_paths_linux', 'scan_paths_linux']
-                for mod_name in module_names:
-                    try:
-                        mod = importlib.import_module(mod_name)
-                        SCAN_PATHS = mod.SCAN_PATHS
-                        break
-                    except ImportError:
-                        continue
-                else:
-                    raise ImportError(f"Could not import scan paths module for OS: {sys.platform}")
+                SCAN_PATHS = self._get_default_scan_paths()
                 var_list.clear()
                 for path in SCAN_PATHS:
                     var = tk.StringVar(value=path)
@@ -522,10 +613,14 @@ class AppConfigurator(tk.Tk):
             all_apps = list_installed_apps_all_os()
             # Trie par disque ou dossier parent
             from collections import defaultdict
-            apps_by_drive = defaultdict(list)
-            for app in all_apps:
-                drive = os.path.splitdrive(app)[0].upper() if sys.platform.startswith('win') else os.path.dirname(app)
-                apps_by_drive[drive].append(app)
+            apps_by_group = defaultdict(list) # Renamed for clarity and consistency
+            for app_path in all_apps:
+                if sys.platform.startswith('win'):
+                    group_key = os.path.splitdrive(app_path)[0].upper() or "(C:)"
+                else: # Group by parent directory for macOS/Linux
+                    group_key = os.path.dirname(app_path) or "/"
+                apps_by_group[group_key].append(app_path)
+
             def show_ui():
                 loader.destroy()
                 # Scrollable frame
@@ -542,14 +637,15 @@ class AppConfigurator(tk.Tk):
                 # Cases à cocher
                 check_vars = {}
                 row = 0
-                for drive in sorted(apps_by_drive.keys()):
-                    drive_label = ttk.Label(frame, text=drive if drive else '(?)', background="#23272e", foreground="#eb8f34", font=("Segoe UI", 11, "bold"))
-                    drive_label.grid(row=row, column=0, sticky='w', pady=(10,2))
+                for group_key in sorted(apps_by_group.keys()):
+                    group_label = ttk.Label(frame, text=group_key, background="#23272e", foreground="#eb8f34", font=("Segoe UI", 11, "bold"))
+                    group_label.grid(row=row, column=0, sticky='w', pady=(10,2))
                     row += 1
-                    for app in sorted(apps_by_drive[drive], key=lambda p: os.path.basename(p).lower()):
-                        var = tk.BooleanVar(value=app in self.selected_apps)
-                        check_vars[app] = var
-                        cb = ttk.Checkbutton(frame, text=os.path.basename(app), variable=var, style='TCheckbutton')
+                    # Sort apps within each group by name
+                    for app_path in sorted(apps_by_group[group_key], key=lambda p: os.path.basename(p).lower()):
+                        var = tk.BooleanVar(value=app_path in self.selected_apps)
+                        check_vars[app_path] = var # Use app_path as key
+                        cb = ttk.Checkbutton(frame, text=os.path.basename(app_path), variable=var, style='TCheckbutton')
                         cb.grid(row=row, column=0, sticky='w', padx=20)
                         row += 1
                 def add_selected():
