@@ -1,6 +1,9 @@
 #!/bin/bash
 # Script de build automatique pour macOS (PyInstaller only)
 
+# Change to project root
+cd "$(dirname "$0")/.."
+
 # Clean previous output
 rm -rf dist
 rm -rf build
@@ -15,6 +18,7 @@ pyinstaller --onefile --windowed src/app_launcher/GetReadyToWork.py --name GetRe
 # Build ParametrageGetReadyToWork (windowed)
 pyinstaller --onefile --windowed src/app_configurator/ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork --add-data "src/config:i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime:default.json,apps_to_launch.json" --add-data "src/common:utils.py,config_manager.py,__init__.py"
 
+echo Release will now be created in release-mac/
 # Create release folder and copy everything needed
 mkdir release-mac
 cp dist/GetReadyToWork release-mac/

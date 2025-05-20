@@ -46,7 +46,7 @@ GetReadyToWork lets you launch your favorite applications in one click, with a m
 - `src/runtime/` : User config and runtime files
 
 ## Packaging (for maintainers)
-- Use the provided build scripts (`build-windows.bat`, `build-linux.sh`, `build-mac.sh`) to create standalone executables with PyInstaller.
+- Use the provided build scripts (`tools/build-windows.bat`, `tools/build-linux.sh`, `tools/build-mac.sh`) to create standalone executables with PyInstaller.
 - Release folders (`release-windows/`, `release-linux/`, `release-mac/`) are generated automatically and should not be committed.
 
 ---

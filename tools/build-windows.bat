@@ -1,6 +1,9 @@
 @echo off
 REM Script de build automatique pour Windows (PyInstaller only)
 
+REM Change to project root
+cd /d %~dp0..
+
 REM Clean previous output
 if exist dist rmdir /s /q dist
 if exist build rmdir /s /q build
@@ -15,6 +18,7 @@ pyinstaller --onefile --noconsole --version-file version_info.txt src\app_launch
 REM Build ParametrageGetReadyToWork.exe
 pyinstaller --onefile --noconsole --version-file version_info.txt src\app_configurator\ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork --add-data "src\\config;i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime;default.json,apps_to_launch.json" --add-data "src\\common;utils.py,config_manager.py,__init__.py"
 
+echo Release will now be created in release-windows\
 REM Create release folder and copy everything needed
 mkdir release-windows
 copy dist\GetReadyToWork.exe release-windows\ >nul
