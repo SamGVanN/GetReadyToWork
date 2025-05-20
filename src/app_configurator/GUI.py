@@ -166,17 +166,39 @@ class AppConfigurator(tk.Tk):
     def find_installed_apps(self):
         apps = []
         scan_paths = self.get_scan_paths()
-        for root in scan_paths:
-            if root and os.path.exists(root):
-                for dirpath, dirnames, filenames in os.walk(root):
-                    for f in filenames:
-                        if f.lower().endswith('.exe'):
-                            apps.append(os.path.join(dirpath, f))
-        # Trie par disque puis nom
+        for root_path in scan_paths: # Renamed root to root_path for clarity
+            if root_path and os.path.exists(root_path):
+                for dirpath, dirnames, filenames in os.walk(root_path):
+                    if sys.platform.startswith('win'):
+                        for f in filenames:
+                            if f.lower().endswith('.exe'):
+                                apps.append(os.path.join(dirpath, f))
+                    elif sys.platform.startswith('darwin'):
+                        for d_name in dirnames: # Iterate over directories for .app bundles
+                            if d_name.lower().endswith('.app'):
+                                apps.append(os.path.join(dirpath, d_name))
+                                dirnames.remove(d_name) # Avoid redundant walk into .app bundle
+                        # Optionally, could check 'filenames' for command-line executables if desired
+                    else: # Linux and other OS
+                        for f in filenames:
+                            file_path = os.path.join(dirpath, f)
+                            # Check for executable permission and ensure it's a file, not a directory
+                            if os.access(file_path, os.X_OK) and not os.path.isdir(file_path):
+                                apps.append(file_path)
+        
+        # Platform-aware sorting key
         def disk_key(path):
-            drive = os.path.splitdrive(path)[0].upper()
-            return (drive, os.path.basename(path).lower())
-        return sorted(set(apps), key=disk_key)
+            path_lower = path.lower()
+            basename_lower = os.path.basename(path_lower)
+            if sys.platform.startswith('win'):
+                drive = os.path.splitdrive(path_lower)[0].upper()
+                return (drive, basename_lower)
+            else: # For macOS and Linux, sort by base path then app name
+                # Ensure consistent sorting for paths like /Applications/AppName.app
+                # and /usr/bin/appname
+                dirname_lower = os.path.dirname(path_lower)
+                return (dirname_lower, basename_lower)
+        return sorted(list(set(apps)), key=disk_key) # Use list(set(apps)) to remove duplicates before sorting
 
     def load_selected_apps(self):
         if os.path.exists(CONFIG_FILE):
@@ -318,34 +340,50 @@ class AppConfigurator(tk.Tk):
         # Vide le contenu des Treeview sans les détruire
         for tree in (self.lb_available, self.lb_selected):
             tree.delete(*tree.get_children())
-        # Trie par disque puis nom
-        def disk_key(path):
-            drive = os.path.splitdrive(path)[0].upper()
-            return (drive, os.path.basename(path).lower())
-        # Liste de gauche (dispo) : treelist par disque
-        drives = {}
-        for app in sorted(self.filtered_apps, key=disk_key):
-            drive = os.path.splitdrive(app)[0].upper()
-            if drive not in drives:
-                drives[drive] = {'id': drive, 'children': []}
-            name = os.path.basename(app)
-            drives[drive]['children'].append({'name': name, 'path': app})
-        for drive, data in drives.items():
-            parent = self.lb_available.insert('', 'end', text=drive if drive else '(?)', open=True)
-            for child in data['children']:
-                self.lb_available.insert(parent, 'end', text=child['name'], tags=(child['path'],))
-        # Liste de droite (choisies) : treelist par disque
-        drives_sel = {}
-        for app in sorted(self.selected_apps, key=disk_key):
-            drive = os.path.splitdrive(app)[0].upper()
-            if drive not in drives_sel:
-                drives_sel[drive] = {'id': drive, 'children': []}
-            name = os.path.basename(app)
-            drives_sel[drive]['children'].append({'name': name, 'path': app})
-        for drive, data in drives_sel.items():
-            parent = self.lb_selected.insert('', 'end', text=drive if drive else '(?)', open=True)
-            for child in data['children']:
-                self.lb_selected.insert(parent, 'end', text=child['name'], tags=(child['path'],))
+        # Platform-aware sorting key (defined in find_installed_apps, but conceptually used here too for sorting before display)
+        def get_group_key(path):
+            if sys.platform.startswith('win'):
+                return os.path.splitdrive(path)[0].upper() or "(C:)" # Default if no drive
+            else: # Group by parent directory for macOS/Linux
+                return os.path.dirname(path) or "/" # Default if root
+
+        # Liste de gauche (dispo) : treelist par groupe (disque ou dossier parent)
+        groups_available = {}
+        # Use the same disk_key from find_installed_apps for sorting to ensure consistency
+        # The disk_key function sorts by (group, name)
+        for app_path in self.filtered_apps: # self.filtered_apps is already sorted by disk_key
+            group_name = get_group_key(app_path)
+            if group_name not in groups_available:
+                groups_available[group_name] = []
+            groups_available[group_name].append({'name': os.path.basename(app_path), 'path': app_path})
+
+        for group_name in sorted(groups_available.keys()):
+            parent = self.lb_available.insert('', 'end', text=group_name, open=True)
+            for child_app in sorted(groups_available[group_name], key=lambda x: x['name'].lower()):
+                self.lb_available.insert(parent, 'end', text=child_app['name'], tags=(child_app['path'],))
+
+        # Liste de droite (choisies) : treelist par groupe
+        groups_selected = {}
+        # self.selected_apps should also be sorted before display grouping
+        # We can sort it using the disk_key from find_installed_apps if it's not already
+        # For simplicity, assume self.selected_apps might not be pre-sorted like self.filtered_apps
+        # However, the disk_key in find_installed_apps is not directly accessible here.
+        # Re-define a simple sort key for selected_apps for now or ensure it's sorted upon modification.
+        
+        # Let's re-use get_group_key and sort selected_apps locally for grouping
+        # Create a temporary sorted list for selected apps for display grouping
+        temp_sorted_selected_apps = sorted(self.selected_apps, key=lambda app_path: (get_group_key(app_path), os.path.basename(app_path).lower()))
+
+        for app_path in temp_sorted_selected_apps:
+            group_name_sel = get_group_key(app_path)
+            if group_name_sel not in groups_selected:
+                groups_selected[group_name_sel] = []
+            groups_selected[group_name_sel].append({'name': os.path.basename(app_path), 'path': app_path})
+            
+        for group_name_sel in sorted(groups_selected.keys()):
+            parent = self.lb_selected.insert('', 'end', text=group_name_sel, open=True)
+            for child_app in sorted(groups_selected[group_name_sel], key=lambda x: x['name'].lower()):
+                self.lb_selected.insert(parent, 'end', text=child_app['name'], tags=(child_app['path'],))
         # Rebinds
         self.lb_available.bind('<Double-Button-1>', lambda e: self.add_app())
         self.lb_available.bind('<Motion>', self.on_treeview_hover)
@@ -522,10 +560,14 @@ class AppConfigurator(tk.Tk):
             all_apps = list_installed_apps_all_os()
             # Trie par disque ou dossier parent
             from collections import defaultdict
-            apps_by_drive = defaultdict(list)
-            for app in all_apps:
-                drive = os.path.splitdrive(app)[0].upper() if sys.platform.startswith('win') else os.path.dirname(app)
-                apps_by_drive[drive].append(app)
+            apps_by_group = defaultdict(list) # Renamed for clarity and consistency
+            for app_path in all_apps:
+                if sys.platform.startswith('win'):
+                    group_key = os.path.splitdrive(app_path)[0].upper() or "(C:)"
+                else: # Group by parent directory for macOS/Linux
+                    group_key = os.path.dirname(app_path) or "/"
+                apps_by_group[group_key].append(app_path)
+
             def show_ui():
                 loader.destroy()
                 # Scrollable frame
@@ -542,14 +584,15 @@ class AppConfigurator(tk.Tk):
                 # Cases à cocher
                 check_vars = {}
                 row = 0
-                for drive in sorted(apps_by_drive.keys()):
-                    drive_label = ttk.Label(frame, text=drive if drive else '(?)', background="#23272e", foreground="#eb8f34", font=("Segoe UI", 11, "bold"))
-                    drive_label.grid(row=row, column=0, sticky='w', pady=(10,2))
+                for group_key in sorted(apps_by_group.keys()):
+                    group_label = ttk.Label(frame, text=group_key, background="#23272e", foreground="#eb8f34", font=("Segoe UI", 11, "bold"))
+                    group_label.grid(row=row, column=0, sticky='w', pady=(10,2))
                     row += 1
-                    for app in sorted(apps_by_drive[drive], key=lambda p: os.path.basename(p).lower()):
-                        var = tk.BooleanVar(value=app in self.selected_apps)
-                        check_vars[app] = var
-                        cb = ttk.Checkbutton(frame, text=os.path.basename(app), variable=var, style='TCheckbutton')
+                    # Sort apps within each group by name
+                    for app_path in sorted(apps_by_group[group_key], key=lambda p: os.path.basename(p).lower()):
+                        var = tk.BooleanVar(value=app_path in self.selected_apps)
+                        check_vars[app_path] = var # Use app_path as key
+                        cb = ttk.Checkbutton(frame, text=os.path.basename(app_path), variable=var, style='TCheckbutton')
                         cb.grid(row=row, column=0, sticky='w', padx=20)
                         row += 1
                 def add_selected():
