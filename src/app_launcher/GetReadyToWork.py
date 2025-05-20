@@ -18,93 +18,43 @@
 
 
 # This is the main launcher script for GetReadyToWork (app_launcher)
-import os, sys, subprocess, logging
+import os
+import sys
+import logging
 import locale
-import json
 from time import sleep
 from datetime import datetime
 import importlib
-from common.config_manager import load_config
-# Ajoute le dossier parent à sys.path pour permettre l'import de common.utils
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-try:
-    from common.utils import get_log_path, setup_logging
-except ImportError:
-    # En mode frozen, le dossier common est à côté de l'exe
-    import importlib.util
-    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
-    utils_path = os.path.join(exe_dir, 'common', 'utils.py')
-    spec = importlib.util.spec_from_file_location('common.utils', utils_path)
-    utils_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(utils_mod)
-    get_log_path = utils_mod.get_log_path
-    setup_logging = utils_mod.setup_logging
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'config')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src')))
-
-# Try to import i18n_resources from config or flat, for both source and frozen modes
-try:
-    if getattr(sys, 'frozen', False):
-        # In frozen mode, look for i18n_resources in the same directory as the executable
-        import importlib.util
-        exe_dir = os.path.dirname(sys.executable)
-        i18n_path = os.path.join(exe_dir, 'i18n_resources.py')
-        if os.path.exists(i18n_path):
-            spec = importlib.util.spec_from_file_location('i18n_resources', i18n_path)
-            i18n_mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(i18n_mod)
-        else:
-            # fallback to importlib (for cx_Freeze zipped builds)
-            i18n_mod = importlib.import_module('i18n_resources')
-    else:
-        try:
-            i18n_mod = importlib.import_module('config.i18n_resources')
-        except ImportError:
-            i18n_mod = importlib.import_module('i18n_resources')
-except Exception as e:
-    print(f"[FATAL] Could not import i18n_resources: {e}")
-    sys.exit(1)
-messages = i18n_mod.messages
-messages_fr = i18n_mod.messages_fr
-
-# Language detection
-lang = locale.getdefaultlocale()[0]
-if lang and lang.startswith('fr'):
-    _ = messages_fr
-else:
-    _ = messages
+from common.utils import setup_logging, load_apps_to_execute, launch_app
+from common.config_manager import get_config_file
 
 setup_logging()
+logging.info('--- Lancement GetReadyToWork.py ---')
 
-# Robustly resolve runtime directory for config files
-if getattr(sys, 'frozen', False):
-    # In frozen mode, runtime files are in the same dir as the executable
-    runtime_dir = os.path.dirname(sys.executable)
-else:
-    runtime_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'runtime'))
+# Robustly resolve config file path
+CONFIG_FILE = get_config_file()
 
-# Ensure runtime directory exists (for writing, if needed)
-os.makedirs(runtime_dir, exist_ok=True)
+# Load the list of apps to execute
+AppsToExecute = load_apps_to_execute(CONFIG_FILE)
 
-AppsToExecute = load_config()
+# i18n messages (optional, if you want to print messages)
+try:
+    import importlib.util
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+    i18n_path = os.path.join(exe_dir, 'config', 'i18n_resources.py')
+    if not os.path.exists(i18n_path):
+        i18n_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'i18n_resources.py')
+    spec = importlib.util.spec_from_file_location('i18n_resources', i18n_path)
+    i18n_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(i18n_mod)
+    from common.utils import get_i18n_messages
+    _ = get_i18n_messages(i18n_mod)
+except Exception:
+    _ = {"go_coffee": "Launching your apps...", "ready": "All apps launched!", "see_you": "See you!"}
 
-def open_file(appName):
-    if sys.platform == "win32":
-        try:
-            os.startfile(appName)
-        except Exception as e:
-            logging.error(f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')} | Failed launching app: {appName} | {e}")
-    else:
-        try:
-            opener = "open" if sys.platform == "darwin" else "xdg-open"
-            subprocess.call([opener, appName])
-        except Exception as e:
-            logging.error(f"Failed launching app: {appName} | {e}")
-
-print(_["go_coffee"])
+print(_["go_coffee"] if "go_coffee" in _ else "Launching your apps...")
 for app in AppsToExecute:
     sleep(0.5)
-    open_file(app)
-print(_["ready"])
-print(_["see_you"])
+    launch_app(app)
+print(_["ready"] if "ready" in _ else "All apps launched!")
+print(_["see_you"] if "see_you" in _ else "See you!")

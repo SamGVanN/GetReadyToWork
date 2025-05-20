@@ -1,18 +1,35 @@
 @echo off
-REM Script de build automatique pour Windows
-REM Utilise le dossier build/latest pour toujours generer dans le meme dossier
+REM Script de build automatique pour Windows (PyInstaller only)
 
-echo Cleaning up previous build directory...
-if exist build\latest rmdir /s /q build\latest
-if exist dist\win rmdir /s /q dist\win
+REM Clean previous output
+if exist dist rmdir /s /q dist
+if exist build rmdir /s /q build
+if exist release-windows rmdir /s /q release-windows
+if exist buildspec rmdir /s /q buildspec
 
-echo Running Windows build...
-python setup.py build_exe --build-exe build/latest
+REM Generate version_info.txt from src/common/version.py
+python tools\generate_version_info.py
 
-REM CX_FREEZE_OUTPUT_PATH is typically build\exe.win-amd64-3.x or similar
-REM If the build output is consistently in a subfolder of build/latest,
-REM we might need to add a step to move files to build/latest directly or dist/win.
-REM For now, assuming build_exe with --build-exe correctly places it.
+REM Build GetReadyToWork.exe
+pyinstaller --onefile --noconsole --version-file version_info.txt src\app_launcher\GetReadyToWork.py --name GetReadyToWork --add-data "src\\config;i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime;default.json,apps_to_launch.json" --add-data "src\\common;utils.py,config_manager.py,__init__.py"
+REM Build ParametrageGetReadyToWork.exe
+pyinstaller --onefile --noconsole --version-file version_info.txt src\app_configurator\ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork --add-data "src\\config;i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime;default.json,apps_to_launch.json" --add-data "src\\common;utils.py,config_manager.py,__init__.py"
 
-echo Build for Windows completed. Output is in build/latest
+REM Create release folder and copy everything needed
+mkdir release-windows
+copy dist\GetReadyToWork.exe release-windows\ >nul
+copy dist\ParametrageGetReadyToWork.exe release-windows\ >nul
+xcopy runtime release-windows\runtime /E /I /Y >nul
+xcopy src\config release-windows\config /E /I /Y >nul
+xcopy src\common release-windows\common /E /I /Y >nul
+
+REM Clean up .spec files
+if exist GetReadyToWork.spec del GetReadyToWork.spec
+if exist ParametrageGetReadyToWork.spec del ParametrageGetReadyToWork.spec
+
+REM Optionally remove dist and build folders to avoid confusion
+rmdir /s /q dist
+rmdir /s /q build
+
+echo Release folder is ready in release-windows\
 pause

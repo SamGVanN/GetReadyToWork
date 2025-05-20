@@ -1,10 +1,42 @@
+import os
+import sys
+import json
+import threading
+import locale
+import subprocess
+import importlib
+import importlib.util
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-import os
-import json
-import importlib
-import threading
-import sys
+
+# Initialisation du logging commun dès le lancement du module
+try:
+    # Essai import absolu (mode dev, script, ou frozen)
+    from src.common.utils import setup_logging
+except Exception:
+    try:
+        from common.utils import setup_logging
+    except Exception:
+        try:
+            # Essai import dynamique (mode frozen)
+            exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+            utils_path = os.path.join(exe_dir, 'common', 'utils.py')
+            if not os.path.exists(utils_path):
+                # fallback build/latest/common/utils.py
+                utils_path = os.path.join(os.path.dirname(__file__), '..', '..', 'common', 'utils.py')
+            spec = importlib.util.spec_from_file_location('common.utils', utils_path)
+            utils_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(utils_mod)
+            setup_logging = utils_mod.setup_logging
+        except Exception as e:
+            import logging
+            logging.basicConfig(filename='logs.log', level=logging.ERROR, format='%(asctime)s %(levelname)s %(message)s')
+            logging.error(f"[FATAL] Impossible d'importer setup_logging: {e}")
+            raise
+setup_logging()
+import logging
+logging.info('--- Lancement module GUI.py ---')
+
 # --- Début correctif robustesse et i18n ---
 try:
     import locale
@@ -50,7 +82,22 @@ except Exception:
 # --- Fin correctif robustesse et i18n ---
 
 # --- Définition des chemins de config robustes ---
-from ..common.config_manager import get_config_file, get_scan_paths_file
+try:
+    from src.common.config_manager import get_config_file, get_scan_paths_file
+except Exception:
+    try:
+        from common.config_manager import get_config_file, get_scan_paths_file
+    except Exception:
+        import importlib.util
+        exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+        cm_path = os.path.join(exe_dir, 'common', 'config_manager.py')
+        if not os.path.exists(cm_path):
+            cm_path = os.path.join(os.path.dirname(__file__), '..', '..', 'common', 'config_manager.py')
+        spec = importlib.util.spec_from_file_location('common.config_manager', cm_path)
+        cm_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cm_mod)
+        get_config_file = cm_mod.get_config_file
+        get_scan_paths_file = cm_mod.get_scan_paths_file
 CONFIG_FILE = get_config_file()
 SCAN_PATHS_USER_FILE = get_scan_paths_file()
 
@@ -128,32 +175,52 @@ class AppConfigurator(tk.Tk):
         self.vsb_selected = None
         self.create_widgets()
 
+    def _get_default_scan_paths(self):
+        """Robustly load the default scan paths for the current OS, compatible with both dev and frozen modes."""
+        import importlib.util
+        import sys
+        import os
+        scan_filename = None
+        if sys.platform.startswith('win'):
+            scan_filename = 'scan_paths_windows.py'
+        elif sys.platform.startswith('darwin'):
+            scan_filename = 'scan_paths_mac.py'
+        else:
+            scan_filename = 'scan_paths_linux.py'
+        # Try frozen mode (PyInstaller)
+        try:
+            if getattr(sys, 'frozen', False):
+                exe_dir = os.path.dirname(sys.executable)
+                scan_path = os.path.join(exe_dir, scan_filename)
+                if not os.path.exists(scan_path):
+                    # Try sys._MEIPASS if available
+                    scan_path = os.path.join(getattr(sys, '_MEIPASS', exe_dir), scan_filename)
+                if not os.path.exists(scan_path):
+                    # Fallback to config subdir (for one-folder mode)
+                    scan_path = os.path.join(exe_dir, 'config', scan_filename)
+            else:
+                # Dev mode: src/config
+                scan_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config', scan_filename))
+            spec = importlib.util.spec_from_file_location('scan_paths', scan_path)
+            scan_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(scan_mod)
+            return list(scan_mod.SCAN_PATHS)
+        except Exception as e:
+            logging.error(f"Error loading default scan paths ({scan_filename}): {e}")
+            return []
+
     def get_scan_paths(self):
         # Charge les paths depuis un fichier de config utilisateur, sinon charge les valeurs par défaut selon l'OS
         if os.path.exists(SCAN_PATHS_USER_FILE):
             try:
                 with open(SCAN_PATHS_USER_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    paths = json.load(f)
+                    if paths:  # If not empty, use them
+                        return paths
             except Exception as e:
                 logging.error(f"Error loading user scan paths: {e}")
-        # Fallback: charge les chemins par défaut selon l'OS
-        try:
-            if sys.platform.startswith('win'):
-                module_names = ['config.scan_paths_windows', 'scan_paths_windows']
-            elif sys.platform.startswith('darwin'):
-                module_names = ['config.scan_paths_mac', 'scan_paths_mac']
-            else:
-                module_names = ['config.scan_paths_linux', 'scan_paths_linux']
-            for mod_name in module_names:
-                try:
-                    mod = importlib.import_module(mod_name)
-                    return mod.SCAN_PATHS
-                except ImportError:
-                    continue
-            raise ImportError(f"Could not import scan paths module for OS: {sys.platform}")
-        except Exception as e:
-            logging.error(f"Error loading default scan paths: {e}")
-            return []
+        # Fallback: robust default scan paths
+        return self._get_default_scan_paths()
 
     def save_scan_paths(self, paths):
         try:
@@ -491,23 +558,9 @@ class AppConfigurator(tk.Tk):
             del var_list[idx]
             refresh_entries()
         def reset_to_default():
-            # Recharge les chemins par défaut selon l'OS
+            # Recharge les chemins par défaut selon l'OS, robustement (dev/frozen)
             try:
-                if sys.platform.startswith('win'):
-                    module_names = ['config.scan_paths_windows', 'scan_paths_windows']
-                elif sys.platform.startswith('darwin'):
-                    module_names = ['config.scan_paths_mac', 'scan_paths_mac']
-                else:
-                    module_names = ['config.scan_paths_linux', 'scan_paths_linux']
-                for mod_name in module_names:
-                    try:
-                        mod = importlib.import_module(mod_name)
-                        SCAN_PATHS = mod.SCAN_PATHS
-                        break
-                    except ImportError:
-                        continue
-                else:
-                    raise ImportError(f"Could not import scan paths module for OS: {sys.platform}")
+                SCAN_PATHS = self._get_default_scan_paths()
                 var_list.clear()
                 for path in SCAN_PATHS:
                     var = tk.StringVar(value=path)

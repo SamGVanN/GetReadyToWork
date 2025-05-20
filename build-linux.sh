@@ -1,24 +1,35 @@
 #!/bin/bash
-# Script de build automatique pour Linux (AppImage)
+# Script de build automatique pour Linux (PyInstaller only)
 
-echo "Cleaning up previous Linux build directory..."
-rm -rf dist/linux
-mkdir -p dist/linux
+# Clean previous output
+rm -rf dist
+rm -rf build
+rm -rf release-linux
+rm -rf buildspec
 
-echo "Running Linux build (bdist_appimage)..."
-# The bdist_appimage command from cx_Freeze often creates the AppImage in the 'dist' directory by default.
-# The 'appimage_path' option in setup.py for bdist_appimage is 'GetReadyToWork.AppImage'.
-# We will run the command and then move the AppImage to dist/linux.
+# Generate version_info.txt from src/common/version.py
+python3 tools/generate_version_info.py
 
-python setup.py bdist_appimage
+# Build GetReadyToWork
+pyinstaller --onefile src/app_launcher/GetReadyToWork.py --name GetReadyToWork --add-data "src/config:i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime:default.json,apps_to_launch.json" --add-data "src/common:utils.py,config_manager.py,__init__.py"
+# Build ParametrageGetReadyToWork
+pyinstaller --onefile src/app_configurator/ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork --add-data "src/config:i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime:default.json,apps_to_launch.json" --add-data "src/common:utils.py,config_manager.py,__init__.py"
 
-# Default output location for bdist_appimage is usually dist/
-# The name is defined in setup.py's bdist_appimage_options as 'GetReadyToWork.AppImage'
-if [ -f "dist/GetReadyToWork.AppImage" ]; then
-    echo "Moving AppImage to dist/linux/"
-    mv dist/GetReadyToWork.AppImage dist/linux/
-else
-    echo "WARNING: AppImage not found in default dist/ location. Check cx_Freeze output."
-fi
+# Create release folder and copy everything needed
+mkdir release-linux
+cp dist/GetReadyToWork release-linux/
+cp dist/ParametrageGetReadyToWork release-linux/
+cp -r runtime release-linux/
+cp -r src/config release-linux/config
+cp -r src/common release-linux/common
+cp src/common/version.py release-linux/common/
 
-echo "Build for Linux (AppImage) completed. Output is in dist/linux"
+# Clean up .spec files
+rm -f GetReadyToWork.spec
+rm -f ParametrageGetReadyToWork.spec
+
+# Optionally remove dist and build folders to avoid confusion
+rm -rf dist
+rm -rf build
+
+echo "Release folder is ready in release-linux/"

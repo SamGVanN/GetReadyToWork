@@ -1,14 +1,35 @@
 #!/bin/bash
-# Script de build automatique pour macOS
+# Script de build automatique pour macOS (PyInstaller only)
 
-echo "Cleaning up previous macOS build directory..."
-rm -rf dist/macos
-mkdir -p dist/macos
+# Clean previous output
+rm -rf dist
+rm -rf build
+rm -rf release-mac
+rm -rf buildspec
 
-echo "Running macOS build (bdist_mac)..."
-python setup.py bdist_mac --dist-dir dist/macos
+# Generate version_info.txt from src/common/version.py
+python3 tools/generate_version_info.py
 
-# The .app bundle will be inside dist/macos/Get Ready To Work.app
-# No specific move needed if --dist-dir works as expected for bdist_mac
+# Build GetReadyToWork (windowed)
+pyinstaller --onefile --windowed src/app_launcher/GetReadyToWork.py --name GetReadyToWork --add-data "src/config:i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime:default.json,apps_to_launch.json" --add-data "src/common:utils.py,config_manager.py,__init__.py"
+# Build ParametrageGetReadyToWork (windowed)
+pyinstaller --onefile --windowed src/app_configurator/ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork --add-data "src/config:i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime:default.json,apps_to_launch.json" --add-data "src/common:utils.py,config_manager.py,__init__.py"
 
-echo "Build for macOS completed. Output is in dist/macos"
+# Create release folder and copy everything needed
+mkdir release-mac
+cp dist/GetReadyToWork release-mac/
+cp dist/ParametrageGetReadyToWork release-mac/
+cp -r runtime release-mac/
+cp -r src/config release-mac/config
+cp -r src/common release-mac/common
+cp src/common/version.py release-mac/common/
+
+# Clean up .spec files
+rm -f GetReadyToWork.spec
+rm -f ParametrageGetReadyToWork.spec
+
+# Optionally remove dist and build folders to avoid confusion
+rm -rf dist
+rm -rf build
+
+echo "Release folder is ready in release-mac/"
