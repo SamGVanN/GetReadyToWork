@@ -15,6 +15,10 @@ GetReadyToWork lets you launch your favorite applications in one click, with a m
 - **Modern and responsive UI** (loader during scans, robust error handling, etc.)
 - **Robust configuration** (auto-save, per-OS scan paths)
 
+
+![Aperçu de l’interface](docs/screenshots/Parametrage.png)
+
+
 ## Quick Start
 
 ### Requirements
