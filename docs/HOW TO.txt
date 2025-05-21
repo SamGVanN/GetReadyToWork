@@ -59,7 +59,7 @@ On macOS:
 ###	MULTIPLATFORM NOTES
 ----------------------------------------
 - The graphical interface works on Windows, Mac, and Linux.
-- Application icon display is only available on Windows.
+- Application icon display is only available on Windows (not working atm).
 - On Windows, for full detection of installed applications, the Python module 'winapps' must be included (already bundled in the .exe).
 - On macOS/Linux, detection uses system standards (Applications, .desktop files, packages).
 - End users do NOT need to use Python or the terminal: just run the provided executable for your OS.

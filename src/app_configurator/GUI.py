@@ -1,54 +1,56 @@
+# pylint: disable=invalid-name
+"""
+GUI module for GetReadyToWork application configurator.
+Provides a Tkinter-based interface for selecting and managing applications to launch.
+"""
 import os
 import sys
 import json
 import threading
-import locale
 import subprocess
 import importlib
 import importlib.util
+import locale
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import logging
+from collections import defaultdict
 
 # Initialisation du logging commun dès le lancement du module
 try:
     # Essai import absolu (mode dev, script, ou frozen)
     from src.common.utils import setup_logging
-except Exception:
+except ImportError:
     try:
         from common.utils import setup_logging
-    except Exception:
+    except ImportError:
         try:
-            # Essai import dynamique (mode frozen)
             exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
             utils_path = os.path.join(exe_dir, 'common', 'utils.py')
             if not os.path.exists(utils_path):
-                # fallback build/latest/common/utils.py
                 utils_path = os.path.join(os.path.dirname(__file__), '..', '..', 'common', 'utils.py')
             spec = importlib.util.spec_from_file_location('common.utils', utils_path)
             utils_mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(utils_mod)
             setup_logging = utils_mod.setup_logging
-        except Exception as e:
-            import logging
+        except (ImportError, AttributeError, FileNotFoundError) as e:
             logging.basicConfig(filename='logs.log', level=logging.ERROR, format='%(asctime)s %(levelname)s %(message)s')
-            logging.error(f"[FATAL] Impossible d'importer setup_logging: {e}")
+            logging.error("[FATAL] Impossible d'importer setup_logging: %s", e)
             raise
 setup_logging()
-import logging
 logging.info('--- Lancement module GUI.py ---')
 
 # --- Début correctif robustesse et i18n ---
 try:
-    import locale
     # Import i18n resources dynamiquement (compatible frozen/script)
     try:
         if getattr(sys, 'frozen', False):
-            import importlib.util
             exe_dir = os.path.dirname(sys.executable)
             i18n_path = os.path.join(exe_dir, 'i18n_resources.py')
             if not os.path.exists(i18n_path):
-                # Ajout correct du dossier src/config au sys.path si besoin
-                config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config'))
+                config_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), '..', 'config')
+                )
                 if config_dir not in sys.path:
                     sys.path.insert(0, config_dir)
                 i18n_mod = importlib.import_module('i18n_resources')
@@ -60,15 +62,16 @@ try:
             try:
                 i18n_mod = importlib.import_module('config.i18n_resources')
             except ImportError:
-                # Ajoute src/config au sys.path si besoin
-                config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config'))
+                config_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), '..', 'config')
+                )
                 if config_dir not in sys.path:
                     sys.path.insert(0, config_dir)
                 i18n_mod = importlib.import_module('i18n_resources')
         messages = i18n_mod.messages
         messages_fr = i18n_mod.messages_fr
-    except Exception as e:
-        print(f"[FATAL] Could not import i18n_resources: {e}")
+    except (ImportError, AttributeError) as e:
+        print("[FATAL] Could not import i18n_resources: %s" % e)
         messages = {"title": "Application selection"}
         messages_fr = {"title": "Paramétrage des applications à lancer"}
     lang = locale.getdefaultlocale()[0]
@@ -76,7 +79,7 @@ try:
         _ = messages_fr
     else:
         _ = messages
-except Exception:
+except (ImportError, AttributeError):
     _ = {"title": "Application selection"}
 
 # --- Fin correctif robustesse et i18n ---
@@ -84,11 +87,10 @@ except Exception:
 # --- Définition des chemins de config robustes ---
 try:
     from src.common.config_manager import get_config_file, get_scan_paths_file
-except Exception:
+except ImportError:
     try:
         from common.config_manager import get_config_file, get_scan_paths_file
-    except Exception:
-        import importlib.util
+    except ImportError:
         exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
         cm_path = os.path.join(exe_dir, 'common', 'config_manager.py')
         if not os.path.exists(cm_path):
@@ -101,12 +103,12 @@ except Exception:
 CONFIG_FILE = get_config_file()
 SCAN_PATHS_USER_FILE = get_scan_paths_file()
 
-# --- Robust logging import ---
-import logging
 
-# --- list_installed_apps_all_os ---
 def list_installed_apps_all_os():
-    import subprocess
+    """
+    List installed applications for all supported operating systems.
+    Returns a sorted list of application paths.
+    """
     apps = []
     if sys.platform.startswith('win'):
         try:
@@ -121,11 +123,12 @@ def list_installed_apps_all_os():
                             found = True
                     if not found:
                         apps.append(exe)
-        except ImportError as e:
-            import tkinter.messagebox
-            tkinter.messagebox.showerror(
+        except ImportError:
+            messagebox.showerror(
                 _["error_winapps"] if "error_winapps" in _ else "Module manquant",
-                _["error_winapps"] if "error_winapps" in _ else "Le module Python 'winapps' est requis pour détecter les applications installées sur Windows.\n\nVeuillez l'installer avec :\npip install winapps"
+                _["error_winapps"] if "error_winapps" in _ else (
+                    "Le module Python 'winapps' est requis pour d\u00e9tecter les applications install\u00e9es sur Windows.\n\nVeuillez l'installer avec :\npip install winapps"
+                )
             )
             return []
     elif sys.platform.startswith('darwin'):
@@ -136,50 +139,69 @@ def list_installed_apps_all_os():
                     if f.endswith('.app'):
                         apps.append(os.path.join(app_dir, f))
         try:
-            output = subprocess.check_output(['brew', 'list', '--cask'], universal_newlines=True)
+            output = subprocess.check_output(
+                ['brew', 'list', '--cask'], universal_newlines=True
+            )
             for line in output.splitlines():
                 apps.append(line.strip())
-        except Exception:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             pass
     else:
-        desktop_dirs = ['/usr/share/applications', os.path.expanduser('~/.local/share/applications')]
+        desktop_dirs = [
+            '/usr/share/applications',
+            os.path.expanduser('~/.local/share/applications')
+        ]
         for ddir in desktop_dirs:
             if os.path.isdir(ddir):
                 for f in os.listdir(ddir):
                     if f.endswith('.desktop'):
                         apps.append(os.path.join(ddir, f))
         try:
-            output = subprocess.check_output(['dpkg-query', '-W', '-f=${Package}\n'], universal_newlines=True)
+            output = subprocess.check_output(
+                ['dpkg-query', '-W', '-f=${Package}\n'], universal_newlines=True
+            )
             for line in output.splitlines():
                 apps.append(line.strip())
-        except Exception:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             pass
     apps = [str(a) for a in apps]
     return sorted(set(apps))
 
+
 class AppConfigurator(tk.Tk):
+    """
+    Main application configurator window for selecting and managing applications to launch.
+    """
     def __init__(self):
+        """Initialize the AppConfigurator window and widgets."""
         super().__init__()
-        self.title(_["title"] if "title" in _ else "GetReadyToWork - Paramétrage")
+        self.title(_["title"] if "title" in _ else "GetReadyToWork - Param\u00e9trage")
         self.geometry('900x500')
         self.resizable(False, False)
         self.configure(bg="#23272e")
-        self.available_apps = self.find_installed_apps()
-        self.selected_apps = self.load_selected_apps()
-        self.filtered_apps = self.available_apps.copy()
+        self.available_apps = []
+        self.selected_apps = []
+        self.filtered_apps = []
         self.icons_cache = {}
         self.tooltip = None
         self.lb_available = None
         self.lb_selected = None
         self.vsb_available = None
         self.vsb_selected = None
+        self.loader_label = None
+        self.scan_path_window = None
+        self.manual_app_window = None
+        self.search_var = None
         self.create_widgets()
+        self.available_apps = self.find_installed_apps()
+        self.selected_apps = self.load_selected_apps()
+        self.filtered_apps = self.available_apps.copy()
+        self.refresh_lists()
 
     def _get_default_scan_paths(self):
-        """Robustly load the default scan paths for the current OS, compatible with both dev and frozen modes."""
-        import importlib.util
-        import sys
-        import os
+        """
+        Robustly load the default scan paths for the current OS, compatible with both dev and frozen modes.
+        """
         scan_filename = None
         if sys.platform.startswith('win'):
             scan_filename = 'scan_paths_windows.py'
@@ -187,105 +209,120 @@ class AppConfigurator(tk.Tk):
             scan_filename = 'scan_paths_mac.py'
         else:
             scan_filename = 'scan_paths_linux.py'
-        # Try frozen mode (PyInstaller)
         try:
             if getattr(sys, 'frozen', False):
                 exe_dir = os.path.dirname(sys.executable)
                 scan_path = os.path.join(exe_dir, scan_filename)
                 if not os.path.exists(scan_path):
-                    # Try sys._MEIPASS if available
-                    scan_path = os.path.join(getattr(sys, '_MEIPASS', exe_dir), scan_filename)
+                    scan_path = os.path.join(
+                        getattr(sys, '_MEIPASS', exe_dir), scan_filename
+                    )
                 if not os.path.exists(scan_path):
-                    # Fallback to config subdir (for one-folder mode)
                     scan_path = os.path.join(exe_dir, 'config', scan_filename)
             else:
-                # Dev mode: src/config
-                scan_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config', scan_filename))
+                scan_path = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), '..', 'config', scan_filename)
+                )
             spec = importlib.util.spec_from_file_location('scan_paths', scan_path)
             scan_mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(scan_mod)
             return list(scan_mod.SCAN_PATHS)
-        except Exception as e:
-            logging.error(f"Error loading default scan paths ({scan_filename}): {e}")
+        except (ImportError, AttributeError, FileNotFoundError) as e:
+            logging.error(
+                "Error loading default scan paths (%s): %s", scan_filename, e
+            )
             return []
 
     def get_scan_paths(self):
-        # Charge les paths depuis un fichier de config utilisateur, sinon charge les valeurs par défaut selon l'OS
+        """
+        Load scan paths from user config file, or fallback to default scan paths for the OS.
+        """
         if os.path.exists(SCAN_PATHS_USER_FILE):
             try:
                 with open(SCAN_PATHS_USER_FILE, 'r', encoding='utf-8') as f:
                     paths = json.load(f)
-                    if paths:  # If not empty, use them
+                    if paths:
                         return paths
-            except Exception as e:
-                logging.error(f"Error loading user scan paths: {e}")
-        # Fallback: robust default scan paths
+            except (OSError, json.JSONDecodeError) as e:
+                logging.error("Error loading user scan paths: %s", e)
         return self._get_default_scan_paths()
 
     def save_scan_paths(self, paths):
+        """
+        Save scan paths to the user config file.
+        """
         try:
             os.makedirs(os.path.dirname(SCAN_PATHS_USER_FILE), exist_ok=True)
             with open(SCAN_PATHS_USER_FILE, 'w', encoding='utf-8') as f:
                 json.dump(paths, f, indent=2)
-        except Exception as e:
-            logging.error(f"Error saving user scan paths: {e}")
+        except OSError as e:
+            logging.error("Error saving user scan paths: %s", e)
 
     def find_installed_apps(self):
+        """
+        Find installed applications by scanning configured paths.
+        Returns a sorted list of application paths.
+        """
         apps = []
         scan_paths = self.get_scan_paths()
-        for root_path in scan_paths: # Renamed root to root_path for clarity
+        for root_path in scan_paths:
             if root_path and os.path.exists(root_path):
                 for dirpath, dirnames, filenames in os.walk(root_path):
                     if sys.platform.startswith('win'):
-                        for f in filenames:
-                            if f.lower().endswith('.exe'):
-                                apps.append(os.path.join(dirpath, f))
+                        for fname in filenames:
+                            if fname.lower().endswith('.exe'):
+                                apps.append(os.path.join(dirpath, fname))
                     elif sys.platform.startswith('darwin'):
-                        for d_name in dirnames: # Iterate over directories for .app bundles
+                        for d_name in dirnames[:]:
                             if d_name.lower().endswith('.app'):
                                 apps.append(os.path.join(dirpath, d_name))
-                                dirnames.remove(d_name) # Avoid redundant walk into .app bundle
-                        # Optionally, could check 'filenames' for command-line executables if desired
-                    else: # Linux and other OS
-                        for f in filenames:
-                            file_path = os.path.join(dirpath, f)
-                            # Check for executable permission and ensure it's a file, not a directory
+                                dirnames.remove(d_name)
+                    else:
+                        for fname in filenames:
+                            file_path = os.path.join(dirpath, fname)
                             if os.access(file_path, os.X_OK) and not os.path.isdir(file_path):
                                 apps.append(file_path)
-        
-        # Platform-aware sorting key
         def disk_key(path):
             path_lower = path.lower()
             basename_lower = os.path.basename(path_lower)
             if sys.platform.startswith('win'):
                 drive = os.path.splitdrive(path_lower)[0].upper()
                 return (drive, basename_lower)
-            else: # For macOS and Linux, sort by base path then app name
-                # Ensure consistent sorting for paths like /Applications/AppName.app
-                # and /usr/bin/appname
-                dirname_lower = os.path.dirname(path_lower)
-                return (dirname_lower, basename_lower)
-        return sorted(list(set(apps)), key=disk_key) # Use list(set(apps)) to remove duplicates before sorting
+            dirname_lower = os.path.dirname(path_lower)
+            return (dirname_lower, basename_lower)
+        return sorted(list(set(apps)), key=disk_key)
 
     def load_selected_apps(self):
+        """
+        Load selected applications from the config file.
+        """
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except Exception as e:
-                logging.error(f"Error loading config: {e}")
+            except (OSError, json.JSONDecodeError) as e:
+                logging.error("Error loading config: %s", e)
         return []
 
     def save_selected_apps(self):
+        """
+        Save selected applications to the config file.
+        """
         try:
             os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.selected_apps, f, indent=2)
-        except Exception as e:
-            logging.error(f"Error saving config: {e}")
-            messagebox.showerror(_["save"] if "save" in _ else "Sauvegarde", _["error_save_config"] if "error_save_config" in _ else str(e))
+        except OSError as e:
+            logging.error("Error saving config: %s", e)
+            messagebox.showerror(
+                _["save"] if "save" in _ else "Sauvegarde",
+                _["error_save_config"] if "error_save_config" in _ else str(e)
+            )
 
     def create_widgets(self):
+        """
+        Create and layout all widgets for the main window.
+        """
         # Style moderne
         style = ttk.Style()
         style.theme_use('clam')
@@ -390,7 +427,9 @@ class AppConfigurator(tk.Tk):
         self.refresh_lists()
 
     def show_loader(self):
-        # Affiche le label de chargement en overlay sans détruire la Treeview ni la scrollbar
+        """
+        Display a loading label overlay in the available apps frame.
+        """
         if hasattr(self, 'loader_label') and self.loader_label is not None:
             return
         self.loader_label = tk.Label(self.frame_available, text="⏳ " + (_['loading'] if 'loading' in _ else 'Chargement...'),
@@ -399,11 +438,17 @@ class AppConfigurator(tk.Tk):
         self.update_idletasks()
 
     def hide_loader(self):
+        """
+        Remove the loading label overlay if present.
+        """
         if hasattr(self, 'loader_label') and self.loader_label is not None:
             self.loader_label.destroy()
             self.loader_label = None
 
     def refresh_lists(self):
+        """
+        Refresh the available and selected apps lists in the UI.
+        """
         # Vide le contenu des Treeview sans les détruire
         for tree in (self.lb_available, self.lb_selected):
             tree.delete(*tree.get_children())
@@ -458,11 +503,17 @@ class AppConfigurator(tk.Tk):
         self.lb_selected.bind('<Motion>', self.on_treeview_hover)
 
     def on_search(self, *args):
+        """
+        Filter available apps based on the search query.
+        """
         query = self.search_var.get().lower()
         self.filtered_apps = [a for a in self.available_apps if query in os.path.basename(a).lower()]
         self.refresh_lists()
 
     def add_app(self):
+        """
+        Add selected app(s) from available list to selected list.
+        """
         try:
             selection = self.lb_available.selection()
             for item in selection:
@@ -473,10 +524,13 @@ class AppConfigurator(tk.Tk):
                 if app and app not in self.selected_apps:
                     self.selected_apps.append(app)
             self.refresh_lists()
-        except Exception as e:
-            logging.error(f"Error adding app: {e}")
+        except (tk.TclError, IndexError) as err:
+            logging.error("Error adding app: %s", err)
 
     def remove_app(self):
+        """
+        Remove selected app(s) from the selected list.
+        """
         try:
             selection = self.lb_selected.selection()
             for item in selection:
@@ -487,10 +541,13 @@ class AppConfigurator(tk.Tk):
                 if app and app in self.selected_apps:
                     self.selected_apps.remove(app)
             self.refresh_lists()
-        except Exception as e:
-            logging.error(f"Error removing app: {e}")
+        except (tk.TclError, IndexError) as err:
+            logging.error("Error removing app: %s", err)
 
     def on_treeview_hover(self, event):
+        """
+        Show tooltip with app path when hovering over a treeview item.
+        """
         tree = event.widget
         item = tree.identify_row(event.y)
         if item:
@@ -504,6 +561,9 @@ class AppConfigurator(tk.Tk):
             self.hide_tooltip()
 
     def show_tooltip(self, widget, x, y, text):
+        """
+        Display a tooltip with the given text at the specified position.
+        """
         self.hide_tooltip()
         self.tooltip = tk.Toplevel(widget)
         self.tooltip.wm_overrideredirect(True)
@@ -512,11 +572,17 @@ class AppConfigurator(tk.Tk):
         label.pack(ipadx=6, ipady=2)
 
     def hide_tooltip(self, event=None):
+        """
+        Hide the tooltip if it is visible.
+        """
         if self.tooltip:
             self.tooltip.destroy()
             self.tooltip = None
 
     def edit_scan_paths(self):
+        """
+        Open a window to edit the scan paths for application discovery.
+        """
         # Si la fenêtre existe déjà, la mettre en avant
         if hasattr(self, 'scan_path_window') and self.scan_path_window is not None and self.scan_path_window.winfo_exists():
             self.scan_path_window.lift()
@@ -591,7 +657,9 @@ class AppConfigurator(tk.Tk):
         ttk.Button(win, text=_["save_paths"] if "save_paths" in _ else "Sauvegarder", command=save_and_close, style='Green.TButton', width=22).pack(pady=10)
 
     def open_manual_app_selector(self):
-        # Ouvre une fenêtre listant toutes les applis installées sur l'OS, indépendamment des dossiers à scanner
+        """
+        Open a window to manually select installed applications from all detected apps.
+        """
         if hasattr(self, 'manual_app_window') and self.manual_app_window is not None and self.manual_app_window.winfo_exists():
             self.manual_app_window.lift()
             self.manual_app_window.focus_force()
@@ -660,6 +728,9 @@ class AppConfigurator(tk.Tk):
         threading.Thread(target=load_and_show, daemon=True).start()
 
     def _on_mousewheel(self, event, tree):
+        """
+        Handle mouse wheel scrolling for the given treeview.
+        """
         # Compatible Windows/Mac/Linux
         if event.num == 5 or event.delta == -120:
             tree.yview_scroll(1, "units")
@@ -668,16 +739,24 @@ class AppConfigurator(tk.Tk):
         return "break"
 
     def _bind_mousewheel(self, tree):
-        # Bind la molette uniquement à ce treeview
+        """
+        Bind mouse wheel events to the given treeview.
+        """
         tree.bind_all('<MouseWheel>', lambda e: self._on_mousewheel(e, tree))
         tree.bind_all('<Button-4>', lambda e: self._on_mousewheel(e, tree))
         tree.bind_all('<Button-5>', lambda e: self._on_mousewheel(e, tree))
 
     def _unbind_mousewheel(self, tree):
+        """
+        Unbind mouse wheel events from the given treeview.
+        """
         tree.unbind_all('<MouseWheel>')
         tree.unbind_all('<Button-4>')
         tree.unbind_all('<Button-5>')
 
     def _save_and_close(self):
+        """
+        Save selected apps and close the configurator window.
+        """
         self.save_selected_apps()
         self.destroy()
