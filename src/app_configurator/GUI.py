@@ -1,3 +1,4 @@
+# pylint: disable=invalid-name
 """
 GUI module for GetReadyToWork application configurator.
 Provides a Tkinter-based interface for selecting and managing applications to launch.
@@ -9,9 +10,11 @@ import threading
 import subprocess
 import importlib
 import importlib.util
+import locale
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import logging
+from collections import defaultdict
 
 # Initialisation du logging commun dès le lancement du module
 try:
@@ -45,7 +48,9 @@ try:
             exe_dir = os.path.dirname(sys.executable)
             i18n_path = os.path.join(exe_dir, 'i18n_resources.py')
             if not os.path.exists(i18n_path):
-                config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config'))
+                config_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), '..', 'config')
+                )
                 if config_dir not in sys.path:
                     sys.path.insert(0, config_dir)
                 i18n_mod = importlib.import_module('i18n_resources')
@@ -57,7 +62,9 @@ try:
             try:
                 i18n_mod = importlib.import_module('config.i18n_resources')
             except ImportError:
-                config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config'))
+                config_dir = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), '..', 'config')
+                )
                 if config_dir not in sys.path:
                     sys.path.insert(0, config_dir)
                 i18n_mod = importlib.import_module('i18n_resources')
@@ -67,7 +74,6 @@ try:
         print("[FATAL] Could not import i18n_resources: %s" % e)
         messages = {"title": "Application selection"}
         messages_fr = {"title": "Paramétrage des applications à lancer"}
-    import locale
     lang = locale.getdefaultlocale()[0]
     if lang and lang.startswith('fr'):
         _ = messages_fr
@@ -117,9 +123,8 @@ def list_installed_apps_all_os():
                             found = True
                     if not found:
                         apps.append(exe)
-        except ImportError as e:
-            import tkinter.messagebox
-            tkinter.messagebox.showerror(
+        except ImportError:
+            messagebox.showerror(
                 _["error_winapps"] if "error_winapps" in _ else "Module manquant",
                 _["error_winapps"] if "error_winapps" in _ else (
                     "Le module Python 'winapps' est requis pour d\u00e9tecter les applications install\u00e9es sur Windows.\n\nVeuillez l'installer avec :\npip install winapps"
@@ -134,20 +139,27 @@ def list_installed_apps_all_os():
                     if f.endswith('.app'):
                         apps.append(os.path.join(app_dir, f))
         try:
-            output = subprocess.check_output(['brew', 'list', '--cask'], universal_newlines=True)
+            output = subprocess.check_output(
+                ['brew', 'list', '--cask'], universal_newlines=True
+            )
             for line in output.splitlines():
                 apps.append(line.strip())
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
     else:
-        desktop_dirs = ['/usr/share/applications', os.path.expanduser('~/.local/share/applications')]
+        desktop_dirs = [
+            '/usr/share/applications',
+            os.path.expanduser('~/.local/share/applications')
+        ]
         for ddir in desktop_dirs:
             if os.path.isdir(ddir):
                 for f in os.listdir(ddir):
                     if f.endswith('.desktop'):
                         apps.append(os.path.join(ddir, f))
         try:
-            output = subprocess.check_output(['dpkg-query', '-W', '-f=${Package}\n'], universal_newlines=True)
+            output = subprocess.check_output(
+                ['dpkg-query', '-W', '-f=${Package}\n'], universal_newlines=True
+            )
             for line in output.splitlines():
                 apps.append(line.strip())
         except (subprocess.CalledProcessError, FileNotFoundError):
@@ -167,16 +179,24 @@ class AppConfigurator(tk.Tk):
         self.geometry('900x500')
         self.resizable(False, False)
         self.configure(bg="#23272e")
-        self.available_apps = self.find_installed_apps()
-        self.selected_apps = self.load_selected_apps()
-        self.filtered_apps = self.available_apps.copy()
+        self.available_apps = []
+        self.selected_apps = []
+        self.filtered_apps = []
         self.icons_cache = {}
         self.tooltip = None
         self.lb_available = None
         self.lb_selected = None
         self.vsb_available = None
         self.vsb_selected = None
+        self.loader_label = None
+        self.scan_path_window = None
+        self.manual_app_window = None
+        self.search_var = None
         self.create_widgets()
+        self.available_apps = self.find_installed_apps()
+        self.selected_apps = self.load_selected_apps()
+        self.filtered_apps = self.available_apps.copy()
+        self.refresh_lists()
 
     def _get_default_scan_paths(self):
         """
@@ -194,17 +214,23 @@ class AppConfigurator(tk.Tk):
                 exe_dir = os.path.dirname(sys.executable)
                 scan_path = os.path.join(exe_dir, scan_filename)
                 if not os.path.exists(scan_path):
-                    scan_path = os.path.join(getattr(sys, '_MEIPASS', exe_dir), scan_filename)
+                    scan_path = os.path.join(
+                        getattr(sys, '_MEIPASS', exe_dir), scan_filename
+                    )
                 if not os.path.exists(scan_path):
                     scan_path = os.path.join(exe_dir, 'config', scan_filename)
             else:
-                scan_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config', scan_filename))
+                scan_path = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), '..', 'config', scan_filename)
+                )
             spec = importlib.util.spec_from_file_location('scan_paths', scan_path)
             scan_mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(scan_mod)
             return list(scan_mod.SCAN_PATHS)
         except (ImportError, AttributeError, FileNotFoundError) as e:
-            logging.error("Error loading default scan paths (%s): %s", scan_filename, e)
+            logging.error(
+                "Error loading default scan paths (%s): %s", scan_filename, e
+            )
             return []
 
     def get_scan_paths(self):
@@ -243,17 +269,17 @@ class AppConfigurator(tk.Tk):
             if root_path and os.path.exists(root_path):
                 for dirpath, dirnames, filenames in os.walk(root_path):
                     if sys.platform.startswith('win'):
-                        for f in filenames:
-                            if f.lower().endswith('.exe'):
-                                apps.append(os.path.join(dirpath, f))
+                        for fname in filenames:
+                            if fname.lower().endswith('.exe'):
+                                apps.append(os.path.join(dirpath, fname))
                     elif sys.platform.startswith('darwin'):
-                        for d_name in dirnames:
+                        for d_name in dirnames[:]:
                             if d_name.lower().endswith('.app'):
                                 apps.append(os.path.join(dirpath, d_name))
                                 dirnames.remove(d_name)
                     else:
-                        for f in filenames:
-                            file_path = os.path.join(dirpath, f)
+                        for fname in filenames:
+                            file_path = os.path.join(dirpath, fname)
                             if os.access(file_path, os.X_OK) and not os.path.isdir(file_path):
                                 apps.append(file_path)
         def disk_key(path):
@@ -262,9 +288,8 @@ class AppConfigurator(tk.Tk):
             if sys.platform.startswith('win'):
                 drive = os.path.splitdrive(path_lower)[0].upper()
                 return (drive, basename_lower)
-            else:
-                dirname_lower = os.path.dirname(path_lower)
-                return (dirname_lower, basename_lower)
+            dirname_lower = os.path.dirname(path_lower)
+            return (dirname_lower, basename_lower)
         return sorted(list(set(apps)), key=disk_key)
 
     def load_selected_apps(self):
@@ -289,7 +314,10 @@ class AppConfigurator(tk.Tk):
                 json.dump(self.selected_apps, f, indent=2)
         except OSError as e:
             logging.error("Error saving config: %s", e)
-            messagebox.showerror(_["save"] if "save" in _ else "Sauvegarde", _["error_save_config"] if "error_save_config" in _ else str(e))
+            messagebox.showerror(
+                _["save"] if "save" in _ else "Sauvegarde",
+                _["error_save_config"] if "error_save_config" in _ else str(e)
+            )
 
     def create_widgets(self):
         """
@@ -496,8 +524,8 @@ class AppConfigurator(tk.Tk):
                 if app and app not in self.selected_apps:
                     self.selected_apps.append(app)
             self.refresh_lists()
-        except (tk.TclError, IndexError) as e:
-            logging.error("Error adding app: %s", e)
+        except (tk.TclError, IndexError) as err:
+            logging.error("Error adding app: %s", err)
 
     def remove_app(self):
         """
@@ -513,8 +541,8 @@ class AppConfigurator(tk.Tk):
                 if app and app in self.selected_apps:
                     self.selected_apps.remove(app)
             self.refresh_lists()
-        except (tk.TclError, IndexError) as e:
-            logging.error("Error removing app: %s", e)
+        except (tk.TclError, IndexError) as err:
+            logging.error("Error removing app: %s", err)
 
     def on_treeview_hover(self, event):
         """
