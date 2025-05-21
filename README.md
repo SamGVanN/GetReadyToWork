@@ -1,11 +1,12 @@
 # GetReadyToWork
 
-GetReadyToWork is a python script originally created to free its user from the repetitive daily task of launching every app he needs on its machine before being able to work.
+GetReadyToWork is originally a python script created to free its user from the repetitive daily task of launching every app he needs on its machine before being able to work.
 For exemple, a programmer would tipically start the day by launching his mailing app, his favorite browser, an IDE, a git GUI or whatever, before being able or willing to work.
 ----> What about doing it all with one click and go fetch some coffee instead ?
 
-GetReadyToWork lets you launch your favorite applications in one click, with a modern, multi-language, cross-platform interface (Windows, macOS, Linux).
+GetReadyToWork lets you launch your favorite applications in one click, with a multi-language cross-platform interface (Windows, macOS, Linux).
 
+<code style="color : name_color">End users do NOT need to install Python or any dependencies. Just use the provided executable for your OS</code>
 
 ## Main Features
 - **Graphical selection of applications to launch** (search, disk grouping)
@@ -17,6 +18,7 @@ GetReadyToWork lets you launch your favorite applications in one click, with a m
 
 
 ![Aperçu de l’interface](docs/screenshots/Parametrage.png)
+
 
 
 ## Quick Start
