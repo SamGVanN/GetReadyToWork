@@ -1,5 +1,6 @@
 #!/bin/bash
 # Script de build automatique pour Linux (PyInstaller only)
+set -e
 
 # Change to project root
 cd "$(dirname "$0")/.."
@@ -14,9 +15,9 @@ rm -rf buildspec
 python3 tools/generate_version_info.py
 
 # Build GetReadyToWork
-pyinstaller --onefile src/app_launcher/GetReadyToWork.py --name GetReadyToWork --add-data "src/config:i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime:default.json,apps_to_launch.json" --add-data "src/common:utils.py,config_manager.py,__init__.py"
+pyinstaller --onefile --paths . src/app_launcher/GetReadyToWork.py --name GetReadyToWork
 # Build ParametrageGetReadyToWork
-pyinstaller --onefile src/app_configurator/ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork --add-data "src/config:i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime:default.json,apps_to_launch.json" --add-data "src/common:utils.py,config_manager.py,__init__.py"
+pyinstaller --onefile --paths . src/app_configurator/ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork
 
 echo Release will now be created in release-linux/
 # Create release folder and copy everything needed
@@ -27,6 +28,8 @@ cp -r runtime release-linux/
 cp -r src/config release-linux/config
 cp -r src/common release-linux/common
 cp src/common/version.py release-linux/common/
+cp tools/install-desktop.sh release-linux/
+chmod +x release-linux/install-desktop.sh
 
 # Clean up .spec files
 rm -f GetReadyToWork.spec

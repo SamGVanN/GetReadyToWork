@@ -15,8 +15,10 @@ On Windows:
     - Double-click ParametrageGetReadyToWork.exe (or GetReadyToWork.exe) in the release-windows/ folder
 On macOS/Linux:
     - Double-click ParametrageGetReadyToWork (or GetReadyToWork) in the release-mac/ or release-linux/ folder
+    - On Linux, you can also run `./install-desktop.sh` inside `release-linux/` to add it permanently to your application menu!
 
 Or, if running from source (for developers):
+    - `source venv/bin/activate` (if on Linux/Mac and you used the install script)
     - `python -m src.app_configurator.ParametrageGetReadyToWork` (configuration)
     - `python -m src.app_launcher.GetReadyToWork` (launcher)
 
@@ -28,8 +30,10 @@ The configuration will be saved automatically in the runtime/ folder.
 ----------------------------------------
 
 End users do NOT need to install Python or any dependencies. Just use the provided executable for your OS in the release-xxx/ folder.
+On Linux, the `release-linux` folder also includes an `install-desktop.sh` script to create application menu shortcuts.
 
-If you are a developer or want to build the app yourself, see below.
+If you are a developer or want to build the app yourself, you can install dependencies manually.
+For Linux and Mac users, it is highly recommended to run `bash installers/install-linux-mac.sh` which automatically creates a virtual environment (`venv`) to safely isolate dependencies from the rest of your system.
 
 #######################################
 ###	HOW TO: Create the executable (for developers/maintainers)
@@ -59,7 +63,7 @@ On macOS:
 ###	MULTIPLATFORM NOTES
 ----------------------------------------
 - The graphical interface works on Windows, Mac, and Linux.
-- Application icon display is only available on Windows.
+- Application icon display is only available on Windows (not working atm).
 - On Windows, for full detection of installed applications, the Python module 'winapps' must be included (already bundled in the .exe).
 - On macOS/Linux, detection uses system standards (Applications, .desktop files, packages).
 - End users do NOT need to use Python or the terminal: just run the provided executable for your OS.

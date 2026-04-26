@@ -52,8 +52,9 @@ How it works:
 - GUI code is in `src/app_configurator/GUI.py`.
 
 ## Packaging
-- Use the build scripts in `tools/` (`build-windows.bat`, `build-linux.sh`, `build-mac.sh`) to create standalone executables with PyInstaller. All necessary files (including `common/` and config) are included in the build.
+- Use the build scripts in `tools/` (`build-windows.bat`, `build-linux.sh`, `build-mac.sh`) to create standalone executables with PyInstaller. All Python dependencies and assets are resolved and bundled natively.
 - For full detection of installed applications on Windows, the Python module `winapps` must be installed (`pip install winapps`).
 - Release folders (`release-windows/`, `release-linux/`, `release-mac/`) are generated automatically and should not be committed.
+- On Linux, the release folder includes `install-desktop.sh` to generate native `.desktop` application menu entries for the user.
 
 See HOW TO.txt for usage and build instructions.
