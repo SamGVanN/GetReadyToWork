@@ -14,9 +14,9 @@ REM Generate version_info.txt from src/common/version.py
 python tools\generate_version_info.py
 
 REM Build GetReadyToWork.exe
-pyinstaller --onefile --noconsole --version-file version_info.txt src\app_launcher\GetReadyToWork.py --name GetReadyToWork --add-data "src\\config;i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime;default.json,apps_to_launch.json" --add-data "src\\common;utils.py,config_manager.py,__init__.py"
+pyinstaller --onefile --paths . --noconsole --version-file version_info.txt src\app_launcher\GetReadyToWork.py --name GetReadyToWork
 REM Build ParametrageGetReadyToWork.exe
-pyinstaller --onefile --noconsole --version-file version_info.txt src\app_configurator\ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork --add-data "src\\config;i18n_resources.py,scan_paths_windows.py,scan_paths_mac.py,scan_paths_linux.py,scan_paths_user.json" --add-data "runtime;default.json,apps_to_launch.json" --add-data "src\\common;utils.py,config_manager.py,__init__.py"
+pyinstaller --onefile --paths . --noconsole --version-file version_info.txt src\app_configurator\ParametrageGetReadyToWork.py --name ParametrageGetReadyToWork
 
 echo Release will now be created in release-windows\
 REM Create release folder and copy everything needed
