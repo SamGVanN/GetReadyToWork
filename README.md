@@ -30,10 +30,10 @@ GetReadyToWork lets you launch your favorite applications in one click, with a m
 ### Local Launch (Development)
 1. Clone this repository
 2. Install dependencies:
-   - Windows: `pip install -r installers/requirements-windows.txt`
-   - Linux/Mac: `pip install -r installers/requirements-linux.txt`
-   - On Windows, also run: `pip install winapps`
+   - **Windows**: `pip install -r installers/requirements-windows.txt` (Also run `pip install winapps`)
+   - **Linux/Mac**: Run `bash installers/install-linux-mac.sh`. This script safely creates a `venv` to avoid modifying system packages.
 3. Launch the apps:
+   - Activate your environment if on Linux/Mac: `source venv/bin/activate`
    - **Launcher:**
      - `python -m src.app_launcher.GetReadyToWork`
    - **Configuration GUI:**
@@ -43,6 +43,7 @@ GetReadyToWork lets you launch your favorite applications in one click, with a m
 - Use the configuration GUI to select and organize the applications you want to launch.
 - The launcher will start all selected apps in one click.
 - All configuration is saved in the `runtime/` folder.
+- **Linux Users**: If you download the release folder, run `./install-desktop.sh` to add the launcher and configurator to your application menu!
 
 ## Project Structure
 - `src/app_launcher/` : Main launcher (`GetReadyToWork.py`)

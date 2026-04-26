@@ -24,9 +24,14 @@ import logging
 import locale
 from time import sleep
 from datetime import datetime
-import importlib
-from common.utils import setup_logging, load_apps_to_execute, launch_app
-from common.config_manager import get_config_file
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.common.utils import setup_logging, load_apps_to_execute, launch_app
+from src.common.config_manager import get_config_file
+from src.config import i18n_resources
 
 setup_logging()
 logging.info('--- Lancement GetReadyToWork.py ---')
@@ -37,20 +42,12 @@ CONFIG_FILE = get_config_file()
 # Load the list of apps to execute
 AppsToExecute = load_apps_to_execute(CONFIG_FILE)
 
-# i18n messages (optional, if you want to print messages)
-try:
-    import importlib.util
-    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
-    i18n_path = os.path.join(exe_dir, 'config', 'i18n_resources.py')
-    if not os.path.exists(i18n_path):
-        i18n_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'i18n_resources.py')
-    spec = importlib.util.spec_from_file_location('i18n_resources', i18n_path)
-    i18n_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(i18n_mod)
-    from common.utils import get_i18n_messages
-    _ = get_i18n_messages(i18n_mod)
-except Exception:
-    _ = {"go_coffee": "Launching your apps...", "ready": "All apps launched!", "see_you": "See you!"}
+# i18n messages
+lang = locale.getdefaultlocale()[0]
+if lang and lang.startswith('fr'):
+    _ = i18n_resources.messages_fr
+else:
+    _ = i18n_resources.messages
 
 print(_["go_coffee"] if "go_coffee" in _ else "Launching your apps...")
 for app in AppsToExecute:

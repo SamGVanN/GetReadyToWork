@@ -16,90 +16,25 @@ from tkinter import ttk, messagebox, filedialog
 import logging
 from collections import defaultdict
 
-# Initialisation du logging commun dès le lancement du module
-try:
-    # Essai import absolu (mode dev, script, ou frozen)
-    from src.common.utils import setup_logging
-except ImportError:
-    try:
-        from common.utils import setup_logging
-    except ImportError:
-        try:
-            exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
-            utils_path = os.path.join(exe_dir, 'common', 'utils.py')
-            if not os.path.exists(utils_path):
-                utils_path = os.path.join(os.path.dirname(__file__), '..', '..', 'common', 'utils.py')
-            spec = importlib.util.spec_from_file_location('common.utils', utils_path)
-            utils_mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(utils_mod)
-            setup_logging = utils_mod.setup_logging
-        except (ImportError, AttributeError, FileNotFoundError) as e:
-            logging.basicConfig(filename='logs.log', level=logging.ERROR, format='%(asctime)s %(levelname)s %(message)s')
-            logging.error("[FATAL] Impossible d'importer setup_logging: %s", e)
-            raise
+# Add project root to sys.path so direct script execution works
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.common.utils import setup_logging
+from src.common.config_manager import get_config_file, get_scan_paths_file
+from src.config import i18n_resources
+from src.config import scan_paths_windows, scan_paths_mac, scan_paths_linux
+
 setup_logging()
 logging.info('--- Lancement module GUI.py ---')
 
-# --- Début correctif robustesse et i18n ---
-try:
-    # Import i18n resources dynamiquement (compatible frozen/script)
-    try:
-        if getattr(sys, 'frozen', False):
-            exe_dir = os.path.dirname(sys.executable)
-            i18n_path = os.path.join(exe_dir, 'i18n_resources.py')
-            if not os.path.exists(i18n_path):
-                config_dir = os.path.abspath(
-                    os.path.join(os.path.dirname(__file__), '..', 'config')
-                )
-                if config_dir not in sys.path:
-                    sys.path.insert(0, config_dir)
-                i18n_mod = importlib.import_module('i18n_resources')
-            else:
-                spec = importlib.util.spec_from_file_location('i18n_resources', i18n_path)
-                i18n_mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(i18n_mod)
-        else:
-            try:
-                i18n_mod = importlib.import_module('config.i18n_resources')
-            except ImportError:
-                config_dir = os.path.abspath(
-                    os.path.join(os.path.dirname(__file__), '..', 'config')
-                )
-                if config_dir not in sys.path:
-                    sys.path.insert(0, config_dir)
-                i18n_mod = importlib.import_module('i18n_resources')
-        messages = i18n_mod.messages
-        messages_fr = i18n_mod.messages_fr
-    except (ImportError, AttributeError) as e:
-        print("[FATAL] Could not import i18n_resources: %s" % e)
-        messages = {"title": "Application selection"}
-        messages_fr = {"title": "Paramétrage des applications à lancer"}
-    lang = locale.getdefaultlocale()[0]
-    if lang and lang.startswith('fr'):
-        _ = messages_fr
-    else:
-        _ = messages
-except (ImportError, AttributeError):
-    _ = {"title": "Application selection"}
+lang = locale.getdefaultlocale()[0]
+if lang and lang.startswith('fr'):
+    _ = i18n_resources.messages_fr
+else:
+    _ = i18n_resources.messages
 
-# --- Fin correctif robustesse et i18n ---
-
-# --- Définition des chemins de config robustes ---
-try:
-    from src.common.config_manager import get_config_file, get_scan_paths_file
-except ImportError:
-    try:
-        from common.config_manager import get_config_file, get_scan_paths_file
-    except ImportError:
-        exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
-        cm_path = os.path.join(exe_dir, 'common', 'config_manager.py')
-        if not os.path.exists(cm_path):
-            cm_path = os.path.join(os.path.dirname(__file__), '..', '..', 'common', 'config_manager.py')
-        spec = importlib.util.spec_from_file_location('common.config_manager', cm_path)
-        cm_mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cm_mod)
-        get_config_file = cm_mod.get_config_file
-        get_scan_paths_file = cm_mod.get_scan_paths_file
 CONFIG_FILE = get_config_file()
 SCAN_PATHS_USER_FILE = get_scan_paths_file()
 
@@ -200,37 +135,17 @@ class AppConfigurator(tk.Tk):
 
     def _get_default_scan_paths(self):
         """
-        Robustly load the default scan paths for the current OS, compatible with both dev and frozen modes.
+        Robustly load the default scan paths for the current OS.
         """
-        scan_filename = None
-        if sys.platform.startswith('win'):
-            scan_filename = 'scan_paths_windows.py'
-        elif sys.platform.startswith('darwin'):
-            scan_filename = 'scan_paths_mac.py'
-        else:
-            scan_filename = 'scan_paths_linux.py'
         try:
-            if getattr(sys, 'frozen', False):
-                exe_dir = os.path.dirname(sys.executable)
-                scan_path = os.path.join(exe_dir, scan_filename)
-                if not os.path.exists(scan_path):
-                    scan_path = os.path.join(
-                        getattr(sys, '_MEIPASS', exe_dir), scan_filename
-                    )
-                if not os.path.exists(scan_path):
-                    scan_path = os.path.join(exe_dir, 'config', scan_filename)
+            if sys.platform.startswith('win'):
+                return list(scan_paths_windows.SCAN_PATHS)
+            elif sys.platform.startswith('darwin'):
+                return list(scan_paths_mac.SCAN_PATHS)
             else:
-                scan_path = os.path.abspath(
-                    os.path.join(os.path.dirname(__file__), '..', 'config', scan_filename)
-                )
-            spec = importlib.util.spec_from_file_location('scan_paths', scan_path)
-            scan_mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(scan_mod)
-            return list(scan_mod.SCAN_PATHS)
-        except (ImportError, AttributeError, FileNotFoundError) as e:
-            logging.error(
-                "Error loading default scan paths (%s): %s", scan_filename, e
-            )
+                return list(scan_paths_linux.SCAN_PATHS)
+        except AttributeError as e:
+            logging.error("Error loading default scan paths: %s", e)
             return []
 
     def get_scan_paths(self):
