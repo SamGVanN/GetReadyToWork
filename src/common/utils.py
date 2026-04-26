@@ -37,7 +37,7 @@ def launch_app(app_path):
     """Launch an application cross-platform."""
     try:
         if sys.platform.startswith('win'):
-            os.startfile(app_path)
+            os.startfile(app_path) # pylint: disable=no-member
         elif sys.platform.startswith('darwin'):
             subprocess.Popen(['open', app_path])
         else:
